@@ -6,9 +6,8 @@ apply plugin: 'org.kordamp.gradle.stats'
 dependencies {
   api project(':openTCS-API-Base')
 
-  api group: 'jakarta.xml.bind', name: 'jakarta.xml.bind-api', version: '4.0.0'
-  api group: 'org.glassfish.jaxb', name: 'jaxb-runtime', version: '4.0.2'
-    implementation 'javax.xml.bind:jaxb-api:2.4.0-b180830.0359'
+  implementation group: 'jakarta.xml.bind', name: 'jakarta.xml.bind-api', version: '4.0.0'
+  implementation group: 'org.glassfish.jaxb', name: 'jaxb-runtime', version: '4.0.2'
 }
 
 processResources.doLast {

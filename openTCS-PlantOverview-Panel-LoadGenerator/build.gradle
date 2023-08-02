@@ -7,7 +7,7 @@ apply plugin: 'org.kordamp.gradle.stats'
 dependencies {
   api project(':openTCS-API-Injection')
   api project(':openTCS-Common')
-    implementation 'javax.xml.bind:jaxb-api:2.4.0-b180830.0359'
+  implementation group: 'jakarta.xml.bind', name: 'jakarta.xml.bind-api', version: '4.0.0'
 }
 
 task release {
