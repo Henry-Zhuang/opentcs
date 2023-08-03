@@ -105,7 +105,7 @@ public class RunKernel {
 
   private static ConfigurationBindingProvider configurationBindingProvider() {
     return new Cfg4jConfigurationBindingProvider(
-        Paths.get(System.getProperty("opentcs.base", "."),
+        Paths.get(System.getProperty("opentcs.base", "openTCS-Kernel\\src\\main\\resources\\org\\opentcs\\kernel\\distribution"),
                   "config",
                   "opentcs-kernel-defaults-baseline.properties")
             .toAbsolutePath(),
@@ -113,7 +113,7 @@ public class RunKernel {
                   "config",
                   "opentcs-kernel-defaults-custom.properties")
             .toAbsolutePath(),
-        Paths.get(System.getProperty("opentcs.home", "."),
+        Paths.get(System.getProperty("opentcs.home", "openTCS-Kernel\\src\\dist"),
                   "config",
                   "opentcs-kernel.properties")
             .toAbsolutePath()
