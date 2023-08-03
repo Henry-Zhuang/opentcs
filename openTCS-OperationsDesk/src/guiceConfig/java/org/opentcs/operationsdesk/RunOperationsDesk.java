@@ -103,7 +103,7 @@ public class RunOperationsDesk {
 
   private static ConfigurationBindingProvider configurationBindingProvider() {
     return new Cfg4jConfigurationBindingProvider(
-        Paths.get(System.getProperty("opentcs.base", "."),
+        Paths.get(System.getProperty("opentcs.base", "openTCS-OperationsDesk\\src\\main\\resources\\org\\opentcs\\operationsdesk\\distribution"),
                   "config",
                   "opentcs-operationsdesk-defaults-baseline.properties")
             .toAbsolutePath(),
@@ -111,7 +111,7 @@ public class RunOperationsDesk {
                   "config",
                   "opentcs-operationsdesk-defaults-custom.properties")
             .toAbsolutePath(),
-        Paths.get(System.getProperty("opentcs.home", "."),
+        Paths.get(System.getProperty("opentcs.home", "openTCS-OperationsDesk\\src\\dist"),
                   "config",
                   "opentcs-operationsdesk.properties")
             .toAbsolutePath()
