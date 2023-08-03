@@ -103,7 +103,7 @@ public class RunModelEditor {
 
   private static ConfigurationBindingProvider configurationBindingProvider() {
     return new Cfg4jConfigurationBindingProvider(
-        Paths.get(System.getProperty("opentcs.base", "."),
+        Paths.get(System.getProperty("opentcs.base", "openTCS-ModelEditor\\src\\main\\resources\\org\\opentcs\\modeleditor\\distribution"),
                   "config",
                   "opentcs-modeleditor-defaults-baseline.properties")
             .toAbsolutePath(),
@@ -111,7 +111,7 @@ public class RunModelEditor {
                   "config",
                   "opentcs-modeleditor-defaults-custom.properties")
             .toAbsolutePath(),
-        Paths.get(System.getProperty("opentcs.home", "."),
+        Paths.get(System.getProperty("opentcs.home", "openTCS-ModelEditor\\src\\dist"),
                   "config",
                   "opentcs-modeleditor.properties")
             .toAbsolutePath()
