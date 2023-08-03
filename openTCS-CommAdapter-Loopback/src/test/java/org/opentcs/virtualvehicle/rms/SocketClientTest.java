@@ -1,14 +1,12 @@
-package org.opentcs.kernel.vehicles.rms;
+package org.opentcs.virtualvehicle.rms;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.opentcs.data.model.Vehicle;
-import org.opentcs.kernel.vehicles.rms.message.Heartbeat;
-import org.opentcs.kernel.vehicles.rms.message.MessageGenerator;
-
-import java.util.Scanner;
+import org.opentcs.drivers.vehicle.VehicleProcessModel;
+import org.opentcs.virtualvehicle.rms.message.Heartbeat;
+import org.opentcs.virtualvehicle.rms.message.MessageGenerator;
 
 public class SocketClientTest {
     private static SocketClient client;
@@ -16,23 +14,23 @@ public class SocketClientTest {
 
     @Test
     public void startup() {
-        Vehicle vehicle = new Vehicle("Vehicle-001");
+        VehicleProcessModel vehicleModel = new VehicleProcessModel(new Vehicle("Vehicle-001"));
+        SocketClient
         client = new SocketClient(
-            vehicle,
+            vehicleModel,
             new MessageGenerator(),
             SocketConstants.TCP_SERVER_IP,
             SocketConstants.TCP_SERVER_PORT
         );
-        client.initialize();
-        client.connect();
+        client.enable();
         while (run) ;
-        client.terminate();
+        client.disable();
     }
 
     @AfterAll
     public static void shutdown() {
         if (client != null)
-            client.terminate();
+            client.disable();
     }
 
     @Test

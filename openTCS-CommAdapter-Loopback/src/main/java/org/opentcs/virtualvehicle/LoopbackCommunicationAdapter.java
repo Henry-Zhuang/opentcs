@@ -33,6 +33,9 @@ import org.opentcs.drivers.vehicle.VehicleProcessModel;
 import org.opentcs.drivers.vehicle.management.VehicleProcessModelTO;
 import org.opentcs.util.ExplainedBoolean;
 import org.opentcs.virtualvehicle.VelocityController.WayEntry;
+import org.opentcs.virtualvehicle.rms.SocketClient;
+import org.opentcs.virtualvehicle.rms.SocketConstants;
+import org.opentcs.virtualvehicle.rms.message.MessageGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,6 +85,8 @@ public class LoopbackCommunicationAdapter
    * The vehicle to this comm adapter instance.
    */
   private final Vehicle vehicle;
+
+  private final SocketClient socketClient;
   /**
    * The vehicle's load state.
    */
@@ -113,6 +118,7 @@ public class LoopbackCommunicationAdapter
           kernelExecutor);
     this.vehicle = requireNonNull(vehicle, "vehicle");
     this.configuration = requireNonNull(configuration, "configuration");
+    this.socketClient = new SocketClient(getProcessModel(), new MessageGenerator(), SocketConstants.TCP_SERVER_IP, SocketConstants.TCP_SERVER_PORT);
   }
 
   @Override
@@ -175,6 +181,7 @@ public class LoopbackCommunicationAdapter
       return;
     }
     getProcessModel().getVelocityController().addVelocityListener(getProcessModel());
+    socketClient.enable();
     super.enable();
   }
 
@@ -184,6 +191,7 @@ public class LoopbackCommunicationAdapter
       return;
     }
     getProcessModel().getVelocityController().removeVelocityListener(getProcessModel());
+    socketClient.disable();
     super.disable();
   }
 

@@ -1,4 +1,4 @@
-package org.opentcs.kernel.vehicles.rms.message;
+package org.opentcs.virtualvehicle.rms.message;
 
 import lombok.Data;
 import lombok.EqualsAndHashCode;

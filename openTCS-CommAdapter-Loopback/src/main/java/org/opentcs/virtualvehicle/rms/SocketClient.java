@@ -1,4 +1,4 @@
-package org.opentcs.kernel.vehicles.rms;
+package org.opentcs.virtualvehicle.rms;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.primitives.UnsignedLong;
@@ -17,15 +17,15 @@ import io.netty.util.CharsetUtil;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.ScheduledFuture;
-import org.opentcs.components.Lifecycle;
+import org.opentcs.data.model.Point;
 import org.opentcs.data.model.Vehicle;
-
-import org.opentcs.kernel.vehicles.rms.message.*;
+import org.opentcs.drivers.vehicle.VehicleProcessModel;
+import org.opentcs.virtualvehicle.LoopbackCommunicationAdapter;
+import org.opentcs.virtualvehicle.rms.message.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
-
 import java.nio.ByteOrder;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -35,73 +35,72 @@ import java.util.concurrent.TimeUnit;
 import static java.util.Objects.requireNonNull;
 import static org.opentcs.util.Assertions.checkInRange;
 
-public class SocketClient implements Lifecycle {
+public class SocketClient {
     /**
      * This class's Logger.
      */
     private static final Logger LOG = LoggerFactory.getLogger(SocketClient.class);
     private static final ObjectMapper objectMapper = new ObjectMapper();
-    private final Vehicle vehicle;
+    private final VehicleProcessModel vehicleModel;
     private final MessageGenerator messageGenerator;
     private final String serverHost;
     private final int serverPort;
     private EventLoopGroup workerGroup;
     private Bootstrap bootstrap;
     private Channel channel;
-    private volatile boolean initialized = false;
+    private volatile boolean enabled = false;
     protected ConcurrentHashMap<UnsignedLong, MessageWrapper> resendTable;
 
     @Inject
-    public SocketClient(@Nonnull Vehicle vehicle,
+    public SocketClient(@Nonnull VehicleProcessModel vehicleModel,
                         @Nonnull MessageGenerator messageGenerator,
                         @Nonnull String serverHost,
                         int serverPort) {
-        this.vehicle = requireNonNull(vehicle, "vehicle");
+        this.vehicleModel = requireNonNull(vehicleModel, "vehicleModel");
         this.messageGenerator = requireNonNull(messageGenerator, "messageGenerator");
         this.serverHost = requireNonNull(serverHost, "serverHost");
         this.serverPort = checkInRange(serverPort, 1, 65535, "serverPort");
     }
 
-    @Override
-    public void initialize() {
-        if (isInitialized()) {
+    public synchronized void enable() {
+        if (isEnabled()) {
             return;
         }
 
         resendTable = new ConcurrentHashMap<UnsignedLong, MessageWrapper>(256);
 
-        this.workerGroup = new NioEventLoopGroup(
-            4, new DefaultThreadFactory(String.format("%s_SocketClient", vehicle.getName()), true)
+        workerGroup = new NioEventLoopGroup(
+            4, new DefaultThreadFactory(String.format("%s_SocketClient", vehicleModel.getName()), true)
         );
-        this.bootstrap = new Bootstrap();
+        bootstrap = new Bootstrap();
 
-        this.bootstrap.group(this.workerGroup)
+        bootstrap.group(workerGroup)
             .channel(NioSocketChannel.class)
             .option(ChannelOption.TCP_NODELAY, true)
             .option(ChannelOption.SO_KEEPALIVE, true)
             .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, SocketConstants.CONNECT_TIMEOUT)
             .handler(new SocketClientInitializer());
-        this.initialized = true;
+
+        enabled = true;
+        connect();
     }
 
-    @Override
-    public boolean isInitialized() {
-        return this.initialized;
-    }
-
-    @Override
-    public void terminate() {
-        if (!isInitialized()) {
+    public synchronized void disable() {
+        if (!isEnabled()) {
             return;
         }
-        this.initialized = false;
+        enabled = false;
         disconnect();
         resendTable.clear();
         resendTable = null;
     }
 
-    public void connect() {
-        if (!isInitialized()) {
+    public synchronized boolean isEnabled() {
+        return enabled;
+    }
+
+    public synchronized void connect() {
+        if (!isEnabled()) {
             return;
         }
 
@@ -109,30 +108,36 @@ public class SocketClient implements Lifecycle {
         try {
             cf.await(SocketConstants.CONNECT_TIMEOUT, TimeUnit.SECONDS);
             if (cf.isSuccess()) {
-                LOG.info("{}: Connected to RMS tcp server({}:{})", vehicle.getName(), serverHost, serverPort);
-                this.channel = cf.channel();
+                LOG.info("{}: Connected to RMS tcp server({}:{})", vehicleModel.getName(), serverHost, serverPort);
+                channel = cf.channel();
             } else {
-                if (!isInitialized()) {
-                    this.workerGroup.shutdownGracefully();
+                if (!isEnabled()) {
+                    workerGroup.shutdownGracefully();
                 } else {
-                    LOG.info("{}: Reconnecting to RMS tcp server......", vehicle.getName());
-                    this.workerGroup.schedule(new ReconnectTask(), getReconnectDelayTime(), TimeUnit.SECONDS);
+                    LOG.info("{}: Reconnecting to RMS tcp server......", vehicleModel.getName());
+                    workerGroup.schedule(new ReconnectTask(), getReconnectDelayTime(), TimeUnit.SECONDS);
                 }
             }
         } catch (InterruptedException ex) {
-            LOG.error(String.format("%s: Connect to RMS tcp server exception: ", vehicle.getName()), ex);
+            LOG.error(String.format("%s: Connect to RMS tcp server exception: ", vehicleModel.getName()), ex);
         }
     }
 
-    public void disconnect() {
-        Future<?> future = this.workerGroup.shutdownGracefully();
+    public synchronized void disconnect() {
+        if (workerGroup.isShuttingDown()) {
+            return;
+        }
+
+        Future<?> future = workerGroup.shutdownGracefully();
         try {
             future.await(5, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
-            LOG.error(String.format("%s: Disconnect exception: ", vehicle.getName()), e);
+            LOG.error(String.format("%s: Disconnect exception: ", vehicleModel.getName()), e);
         }
-        this.channel.close();
-        LOG.info("{}: Disconnected from RMS tcp server({}:{})", vehicle.getName(), serverHost, serverPort);
+        if (channel != null) {
+            channel.close();
+            LOG.info("{}: Disconnected from RMS tcp server({}:{})", vehicleModel.getName(), serverHost, serverPort);
+        }
     }
 
     public boolean sendHeartbeat(@Nonnull Heartbeat hb) {
@@ -179,7 +184,7 @@ public class SocketClient implements Lifecycle {
                 LOG.error(
                     String.format(
                         "%s: awaitSend[type=%s, uniqueID=%s] exception: ",
-                        vehicle.getName(),
+                        vehicleModel.getName(),
                         msg.getType(),
                         msg.getParams().getUniqueID().toString()
                     ), e);
@@ -195,7 +200,7 @@ public class SocketClient implements Lifecycle {
                     LOG.error(
                         String.format(
                             "%s: awaitAck[type=%s, uniqueID=%s] exception: ",
-                            vehicle.getName(),
+                            vehicleModel.getName(),
                             msg.getType(),
                             uniqueID.toString()
                         ), e);
@@ -212,7 +217,8 @@ public class SocketClient implements Lifecycle {
     }
 
     private int getReconnectDelayTime() {
-        return new Random().nextInt(5);
+//    return new Random().nextInt(5);
+        return 2;
     }
 
     private boolean isImmediateCommand(Message msg) {
@@ -223,18 +229,18 @@ public class SocketClient implements Lifecycle {
     private void processReceivedAck(Message msg) {
         Response ack = msg instanceof Response ? (Response) msg : null;
         if (ack != null) {
-            LOG.info("{}: Ack received:{}", vehicle.getName(), ack);
+            LOG.info("{}: Ack received:{}", vehicleModel.getName(), ack);
             final UnsignedLong uniqueID = ack.getParams().getUniqueID();
             if (uniqueID != null) {
-                final MessageWrapper msgWrapper = this.resendTable.get(uniqueID);
+                final MessageWrapper msgWrapper = resendTable.get(uniqueID);
                 if (msgWrapper != null) {
                     msgWrapper.setAckSuccess(true);
                     msgWrapper.releaseAck();
-                    this.resendTable.remove(uniqueID);
+                    resendTable.remove(uniqueID);
                 } else {
                     LOG.warn(
                         "{}: Ack for message[{}] was received but not required",
-                        vehicle.getName(),
+                        vehicleModel.getName(),
                         ack.getParams().getUniqueID()
                     );
                 }
@@ -245,7 +251,8 @@ public class SocketClient implements Lifecycle {
     private void processReceivedCommand(Message msg) {
         Command cmd = msg instanceof Command ? (Command) msg : null;
         if (cmd != null) {
-            LOG.info("{}: Command received:{}", vehicle.getName(), cmd);
+            LOG.info("{}: Command received:{}", vehicleModel.getName(), cmd);
+
         }
     }
 
@@ -298,20 +305,32 @@ public class SocketClient implements Lifecycle {
             dataMap.put("type", msg.getType());
             Map<String, Object> params = new HashMap<>();
             params.put("robotID", msg.getParams().getRobotID());
-            params.put("uniqueID", msg.getParams().getUniqueID());
+            if (msg.getParams().getUniqueID() != null)
+                params.put("uniqueID", msg.getParams().getUniqueID());
             if (msg instanceof Heartbeat) {
                 Heartbeat hb = (Heartbeat) msg;
-                params.put("status", hb.getParams().getStatus());
-                params.put("position", hb.getParams().getPosition());
-                params.put("theta", hb.getParams().getTheta());
-                params.put("batteryInfo", objectMapper.writeValueAsString(hb.getParams().getBatteryInfo()));
-                params.put("odo", hb.getParams().getOdo());
-                params.put("today_odo", hb.getParams().getToday_odo());
+                if (hb.getParams().getStatus() != null)
+                    params.put("status", hb.getParams().getStatus());
+                if (hb.getParams().getPosition() != null)
+                    params.put("position", hb.getParams().getPosition());
+                else
+                    params.put("position", 0);
+                if (hb.getParams().getTheta() != null)
+                    params.put("theta", hb.getParams().getTheta());
+                if (hb.getParams().getBatteryInfo() != null)
+                    params.put("batteryInfo", objectMapper.writeValueAsString(hb.getParams().getBatteryInfo()));
+                if (hb.getParams().getOdo() != null)
+                    params.put("odo", hb.getParams().getOdo());
+                if (hb.getParams().getToday_odo() != null)
+                    params.put("today_odo", hb.getParams().getToday_odo());
             } else if (msg instanceof Result) {
                 Result result = (Result) msg;
-                params.put("barcode", result.getParams().getBarcode());
-                params.put("errorCode", result.getParams().getErrorCode());
-                params.put("errorReason", result.getParams().getErrorReason());
+                if (result.getParams().getBarcode() != null)
+                    params.put("barcode", result.getParams().getBarcode());
+                if (result.getParams().getErrorCode() != null)
+                    params.put("errorCode", result.getParams().getErrorCode());
+                if (result.getParams().getErrorReason() != null)
+                    params.put("errorReason", result.getParams().getErrorReason());
             }
             dataMap.put("params", objectMapper.writeValueAsString(params));
             return objectMapper.writeValueAsString(dataMap);
@@ -357,13 +376,13 @@ public class SocketClient implements Lifecycle {
         @Override
         public void channelActive(@Nonnull ChannelHandlerContext ctx) throws Exception {
             if (hbFuture == null || hbFuture.isCancelled()) {
-                this.hbFuture = ctx.executor().scheduleAtFixedRate(
+                hbFuture = ctx.executor().scheduleAtFixedRate(
                     new SendHeartbeatTask(), 1000,
                     SocketConstants.HEARTBEAT_INTERVAL_MILLIS, TimeUnit.MILLISECONDS
                 );
             }
             if (resendFuture == null || resendFuture.isCancelled()) {
-                this.resendFuture = ctx.executor().scheduleAtFixedRate(
+                resendFuture = ctx.executor().scheduleAtFixedRate(
                     new ScanResendTableTask(), 3 * 1000,
                     SocketConstants.RESEND_INTERVAL_MILLIS, TimeUnit.MILLISECONDS
                 );
@@ -381,7 +400,7 @@ public class SocketClient implements Lifecycle {
                 resendFuture.cancel(true);
             }
             // 重新连接至RMS
-            LOG.info(String.format("%s: Reconnecting to RMS tcp server......", vehicle.getName()));
+            LOG.info(String.format("%s: Reconnecting to RMS tcp server......", vehicleModel.getName()));
             ctx.executor().schedule(new ReconnectTask(), getReconnectDelayTime(), TimeUnit.SECONDS);
         }
 
@@ -408,7 +427,7 @@ public class SocketClient implements Lifecycle {
 
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-            LOG.error(String.format("%s: Exception caught: ", vehicle.getName()), cause);
+            LOG.error(String.format("%s: Exception caught: ", vehicleModel.getName()), cause);
             // 停止定时发送心跳任务
             if (hbFuture != null && !hbFuture.isCancelled()) {
                 hbFuture.cancel(true);
@@ -427,31 +446,32 @@ public class SocketClient implements Lifecycle {
             try {
                 sendVehicleHeartbeat();
             } catch (Throwable e) {
-                LOG.error(String.format("%s: sendHeartbeat exception: ", vehicle.getName()), e);
+                LOG.error(String.format("%s: sendHeartbeat exception: ", vehicleModel.getName()), e);
             }
         }
 
         private void sendVehicleHeartbeat() {
-            // Test
-            Heartbeat.HeartbeatParams.BatteryInfo batteryInfo = new Heartbeat.HeartbeatParams.BatteryInfo(
-                220.0,
-                5.0,
-                95.5,
-                false,
-                false,
-                35.5,
-                95.5
-            );
-            Heartbeat.HeartbeatParams hbParams = new Heartbeat.HeartbeatParams(
-                0, 4012, 1.01, batteryInfo, 20.0, 10.0
-            );
-            hbParams.setRobotID(2);
+            Heartbeat.HeartbeatParams hbParams = new Heartbeat.HeartbeatParams();
+
+            hbParams.setRobotID(ObjectNameConvertor.toObjectId(Vehicle.class, vehicleModel.getName()));
+            hbParams.setStatus(0);
+            hbParams.setPosition(ObjectNameConvertor.toObjectId(Point.class, vehicleModel.getVehiclePosition()));
+            double theta = vehicleModel.getVehicleOrientationAngle();
+            if (!Double.isNaN(theta)) {
+                hbParams.setTheta(theta);
+            }
+            hbParams.setOdo(10.0);
+            hbParams.setToday_odo(20.0);
+            Heartbeat.HeartbeatParams.BatteryInfo batteryInfo = new Heartbeat.HeartbeatParams.BatteryInfo();
+            batteryInfo.setPercentage((double) vehicleModel.getVehicleEnergyLevel());
+            hbParams.setBatteryInfo(batteryInfo);
+
             Heartbeat hb = new Heartbeat();
-            hb.setParams(hbParams);
             hb.setDeviceType(1);
             hb.setChannel(2);
             hb.setType("heartbeat");
-            SocketClient.this.sendHeartbeat(hb);
+            hb.setParams(hbParams);
+            sendHeartbeat(hb);
         }
     }
 
@@ -461,12 +481,12 @@ public class SocketClient implements Lifecycle {
             try {
                 scanResendTable();
             } catch (Throwable e) {
-                LOG.error(String.format("%s: scanResendTable exception: ", vehicle.getName()), e);
+                LOG.error(String.format("%s: scanResendTable exception: ", vehicleModel.getName()), e);
             }
         }
 
         private void scanResendTable() {
-            Iterator<Map.Entry<UnsignedLong, MessageWrapper>> it = SocketClient.this.resendTable.entrySet().iterator();
+            Iterator<Map.Entry<UnsignedLong, MessageWrapper>> it = resendTable.entrySet().iterator();
             while (it.hasNext()) {
                 Map.Entry<UnsignedLong, MessageWrapper> next = it.next();
                 MessageWrapper msgWrapper = next.getValue();
@@ -480,8 +500,8 @@ public class SocketClient implements Lifecycle {
                         // 消息重发
                         Message msg = msgWrapper.getMsg();
                         boolean needAck = msg.getHeader().getMsgMode() == (byte) 1;
-                        SocketClient.this.send(msg, needAck, false);
-                        LOG.info(String.format("%s: Resend message: %s", vehicle.getName(), msg));
+                        send(msg, needAck, false);
+                        LOG.info(String.format("%s: Resend message: %s", vehicleModel.getName(), msg));
                     }
                 }
             }
@@ -491,7 +511,7 @@ public class SocketClient implements Lifecycle {
     private class ReconnectTask implements Runnable {
         @Override
         public void run() {
-            SocketClient.this.connect();
+            connect();
         }
     }
 
@@ -512,24 +532,24 @@ public class SocketClient implements Lifecycle {
         }
 
         public void awaitSend(int sendTimeout, TimeUnit unit) throws InterruptedException {
-            this.sendCountDownLatch.await(sendTimeout, unit);
+            sendCountDownLatch.await(sendTimeout, unit);
         }
 
         public void releaseSend() {
-            this.sendCountDownLatch.countDown();
+            sendCountDownLatch.countDown();
         }
 
         public void awaitAck(int ackTimeout, TimeUnit unit) throws InterruptedException {
-            this.ackCountDownLatch.await(ackTimeout, unit);
+            ackCountDownLatch.await(ackTimeout, unit);
         }
 
         public void releaseAck() {
-            this.ackCountDownLatch.countDown();
+            ackCountDownLatch.countDown();
         }
 
         public void releaseAll() {
-            this.sendCountDownLatch.countDown();
-            this.ackCountDownLatch.countDown();
+            sendCountDownLatch.countDown();
+            ackCountDownLatch.countDown();
         }
 
         public long getBeginTimestamp() {

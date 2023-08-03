@@ -1,4 +1,4 @@
-package org.opentcs.kernel.vehicles.rms.message;
+package org.opentcs.virtualvehicle.rms.message;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -10,8 +10,8 @@ public abstract class Message {
     @JsonIgnore
     private Header header;
 
-    private int deviceType;
-    private int channel;
+    private Integer deviceType;
+    private Integer channel;
     private String type;
 
     private Params params;
@@ -39,7 +39,7 @@ public abstract class Message {
     @Data
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class Params {
-        private int robotID;
+        private Integer robotID;
         private UnsignedLong uniqueID;
     }
 }

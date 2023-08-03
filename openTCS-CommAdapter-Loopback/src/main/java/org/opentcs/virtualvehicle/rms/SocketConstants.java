@@ -1,4 +1,4 @@
-package org.opentcs.kernel.vehicles.rms;
+package org.opentcs.virtualvehicle.rms;
 
 import java.util.HashMap;
 import java.util.Map;

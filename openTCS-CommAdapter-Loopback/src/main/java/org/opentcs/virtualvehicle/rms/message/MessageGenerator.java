@@ -1,8 +1,4 @@
-package org.opentcs.kernel.vehicles.rms.message;
-
-import java.util.HashMap;
-import java.util.Map;
-import java.util.function.Function;
+package org.opentcs.virtualvehicle.rms.message;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 

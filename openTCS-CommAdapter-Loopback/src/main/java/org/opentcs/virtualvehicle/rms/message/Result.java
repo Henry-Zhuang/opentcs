@@ -1,4 +1,4 @@
-package org.opentcs.kernel.vehicles.rms.message;
+package org.opentcs.virtualvehicle.rms.message;
 
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -13,9 +13,9 @@ public class Result extends Message {
     @Data
     @ToString(callSuper = true)
     @EqualsAndHashCode(callSuper = true)
-    public static class ResultParams extends Message.Params {
+    public static class ResultParams extends Params {
         private String barcode;
-        private int errorCode;
-        private int errorReason;
+        private Integer errorCode;
+        private Integer errorReason;
     }
 }

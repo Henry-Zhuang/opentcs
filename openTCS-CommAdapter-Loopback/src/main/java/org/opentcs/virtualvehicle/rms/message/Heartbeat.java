@@ -1,5 +1,6 @@
-package org.opentcs.kernel.vehicles.rms.message;
+package org.opentcs.virtualvehicle.rms.message;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
@@ -7,19 +8,21 @@ import lombok.ToString;
 @Data
 @ToString(callSuper = true)
 @EqualsAndHashCode(callSuper = true)
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class Heartbeat extends Message {
     private HeartbeatParams params;
 
     @Data
     @ToString(callSuper = true)
     @EqualsAndHashCode(callSuper = true)
-    public static class HeartbeatParams extends Message.Params {
-        private int status;
-        private int position;
-        private double theta;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class HeartbeatParams extends Params {
+        private Integer status;
+        private Integer position;
+        private Double theta;
         private BatteryInfo batteryInfo;
-        private double odo;
-        private double today_odo;
+        private Double odo;
+        private Double today_odo;
 
         public HeartbeatParams() {
         }
@@ -39,14 +42,15 @@ public class Heartbeat extends Message {
         }
 
         @Data
+        @JsonInclude(JsonInclude.Include.NON_NULL)
         public static class BatteryInfo {
-            private double voltage;
-            private double current;
-            private double capacityRemain;
-            private boolean chargingStatus;
-            private boolean chargerConnected;
-            private double temperature;
-            private double percentage;
+            private Double voltage;
+            private Double current;
+            private Double capacityRemain;
+            private Boolean chargingStatus;
+            private Boolean chargerConnected;
+            private Double temperature;
+            private Double percentage;
 
             public BatteryInfo() {
             }
