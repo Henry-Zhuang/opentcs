@@ -18,8 +18,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import javax.annotation.Nonnull;
 import javax.inject.Inject;
 import org.opentcs.common.LoopbackAdapterConstants;
+import org.opentcs.components.kernel.services.TransportOrderService;
 import org.opentcs.customizations.kernel.KernelExecutor;
 import org.opentcs.data.model.Vehicle;
 import org.opentcs.data.order.Route.Step;
@@ -35,7 +37,6 @@ import org.opentcs.util.ExplainedBoolean;
 import org.opentcs.virtualvehicle.VelocityController.WayEntry;
 import org.opentcs.virtualvehicle.rms.SocketClient;
 import org.opentcs.virtualvehicle.rms.SocketConstants;
-import org.opentcs.virtualvehicle.rms.message.MessageGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -110,7 +111,8 @@ public class LoopbackCommunicationAdapter
   @Inject
   public LoopbackCommunicationAdapter(VirtualVehicleConfiguration configuration,
                                       @Assisted Vehicle vehicle,
-                                      @KernelExecutor ScheduledExecutorService kernelExecutor) {
+                                      @KernelExecutor ScheduledExecutorService kernelExecutor,
+                                      @Nonnull TransportOrderService orderService) {
     super(new LoopbackVehicleModel(vehicle),
           configuration.commandQueueCapacity(),
           1,
@@ -118,7 +120,12 @@ public class LoopbackCommunicationAdapter
           kernelExecutor);
     this.vehicle = requireNonNull(vehicle, "vehicle");
     this.configuration = requireNonNull(configuration, "configuration");
-    this.socketClient = new SocketClient(getProcessModel(), new MessageGenerator(), SocketConstants.TCP_SERVER_IP, SocketConstants.TCP_SERVER_PORT);
+    this.socketClient = new SocketClient(
+        getProcessModel(),
+        orderService,
+        SocketConstants.TCP_SERVER_IP,
+        SocketConstants.TCP_SERVER_PORT
+    );
   }
 
   @Override
@@ -181,8 +188,8 @@ public class LoopbackCommunicationAdapter
       return;
     }
     getProcessModel().getVelocityController().addVelocityListener(getProcessModel());
-    socketClient.enable();
     super.enable();
+    socketClient.enable();
   }
 
   @Override
