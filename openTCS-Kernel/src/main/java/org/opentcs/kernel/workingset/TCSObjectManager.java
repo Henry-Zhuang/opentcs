@@ -17,6 +17,8 @@ import org.opentcs.data.ObjectUnknownException;
 import org.opentcs.data.TCSObject;
 import org.opentcs.data.TCSObjectEvent;
 import org.opentcs.data.TCSObjectReference;
+import org.opentcs.data.order.TransportOrder;
+import org.opentcs.drivers.vehicle.rms.OrderFinalStateEvent;
 import org.opentcs.util.event.EventHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -129,4 +131,10 @@ public class TCSObjectManager {
     eventHandler.onEvent(new TCSObjectEvent(currentObjectState, previousObjectState, evtType));
   }
 
+  public void emitOrderFinalStateEvent(String orderName,
+                                       String orderType,
+                                       String vehicleName,
+                                       TransportOrder.State finalState){
+    eventHandler.onEvent(new OrderFinalStateEvent(orderName, orderType, vehicleName, finalState));
+  }
 }

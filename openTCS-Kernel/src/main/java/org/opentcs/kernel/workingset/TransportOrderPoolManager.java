@@ -189,6 +189,11 @@ public class TransportOrderPoolManager
 
     TransportOrder order = previousState.withState(newState);
     getObjectRepo().replaceObject(order);
+
+    if (newState.isFinalState() && order.getIntendedVehicle().getName() != null){
+      emitOrderFinalStateEvent(order.getName(), order.getType(), order.getIntendedVehicle().getName(), newState);
+    }
+
     emitObjectEvent(order,
                     previousState,
                     TCSObjectEvent.Type.OBJECT_MODIFIED);
@@ -588,7 +593,8 @@ public class TransportOrderPoolManager
 
   private boolean isValidOperationOnPoint(String operation) {
     return operation.equals(Destination.OP_MOVE)
-        || operation.equals(Destination.OP_PARK);
+        || operation.equals(Destination.OP_PARK)
+        || operation.equals(Destination.OP_NOP);
   }
 
   private boolean isValidLocationDestination(DestinationCreationTO dest, Location location) {

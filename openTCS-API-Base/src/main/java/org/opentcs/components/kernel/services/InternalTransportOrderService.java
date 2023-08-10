@@ -8,6 +8,9 @@
 package org.opentcs.components.kernel.services;
 
 import java.util.List;
+
+import org.opentcs.access.to.order.TransportOrderCreationTO;
+import org.opentcs.data.ObjectExistsException;
 import org.opentcs.data.ObjectUnknownException;
 import org.opentcs.data.TCSObjectReference;
 import org.opentcs.data.model.Vehicle;
@@ -106,4 +109,7 @@ public interface InternalTransportOrderService
   void updateTransportOrderState(TCSObjectReference<TransportOrder> ref,
                                  TransportOrder.State state)
       throws ObjectUnknownException;
+
+  TransportOrder createFinishedTransportOrder(TransportOrderCreationTO to)
+      throws ObjectUnknownException, ObjectExistsException;
 }
