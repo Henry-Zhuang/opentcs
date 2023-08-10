@@ -82,7 +82,7 @@ public class VehicleProcessModel {
   /**
    * The vehicle's energy level.
    */
-  private int energyLevel = 100;
+  private double energyLevel = 100;
   /**
    * The vehicle's load handling devices (state).
    */
@@ -311,7 +311,7 @@ public class VehicleProcessModel {
    *
    * @return The vehicle's current energy level.
    */
-  public int getVehicleEnergyLevel() {
+  public double getVehicleEnergyLevel() {
     return energyLevel;
   }
 
@@ -320,8 +320,8 @@ public class VehicleProcessModel {
    *
    * @param newLevel The new level.
    */
-  public void setVehicleEnergyLevel(int newLevel) {
-    int oldValue = this.energyLevel;
+  public void setVehicleEnergyLevel(double newLevel) {
+    double oldValue = this.energyLevel;
     this.energyLevel = newLevel;
 
     getPropertyChangeSupport().firePropertyChange(Attribute.ENERGY_LEVEL.name(),

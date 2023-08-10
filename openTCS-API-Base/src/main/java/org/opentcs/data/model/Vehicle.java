@@ -64,7 +64,7 @@ public class Vehicle
   /**
    * This vehicle's remaining energy (in percent of the maximum).
    */
-  private final int energyLevel;
+  private final double energyLevel;
   /**
    * This vehicle's maximum velocity (in mm/s).
    */
@@ -206,7 +206,7 @@ public class Vehicle
                   TCSObjectReference<Point> nextPosition,
                   Triple precisePosition,
                   double orientationAngle,
-                  int energyLevel,
+                  double energyLevel,
                   List<LoadHandlingDevice> loadHandlingDevices,
                   Layout layout) {
     super(name, properties, history);
@@ -246,7 +246,11 @@ public class Vehicle
         orientationAngle
     );
     this.orientationAngle = orientationAngle;
-    this.energyLevel = checkInRange(energyLevel, 0, 100, "energyLevel");
+    checkArgument(
+        energyLevel >=0.0 && energyLevel <= 100.0,
+        "Illegal energyLevel: %s",
+        energyLevel);
+    this.energyLevel = energyLevel;
     this.loadHandlingDevices = listWithoutNullValues(requireNonNull(loadHandlingDevices,
                                                                     "loadHandlingDevices"));
     this.layout = requireNonNull(layout, "layout");
@@ -385,7 +389,7 @@ public class Vehicle
    *
    * @return This vehicle's remaining energy.
    */
-  public int getEnergyLevel() {
+  public double getEnergyLevel() {
     return energyLevel;
   }
 
@@ -395,7 +399,7 @@ public class Vehicle
    * @param energyLevel The value to be set in the copy.
    * @return A copy of this object, differing in the given value.
    */
-  public Vehicle withEnergyLevel(int energyLevel) {
+  public Vehicle withEnergyLevel(double energyLevel) {
     return new Vehicle(getName(),
                        getProperties(),
                        getHistory(),

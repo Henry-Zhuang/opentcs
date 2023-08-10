@@ -103,7 +103,7 @@ public class StandardVehicleService
   }
 
   @Override
-  public void updateVehicleEnergyLevel(TCSObjectReference<Vehicle> ref, int energyLevel)
+  public void updateVehicleEnergyLevel(TCSObjectReference<Vehicle> ref, double energyLevel)
       throws ObjectUnknownException {
     synchronized (globalSyncObject) {
       plantModelManager.setVehicleEnergyLevel(ref, energyLevel);

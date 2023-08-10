@@ -58,7 +58,7 @@ public class VehicleProcessModelTO
   /**
    * The vehicle's energy level.
    */
-  private int energyLevel;
+  private double energyLevel;
   /**
    * A list of load handling devices attached to the vehicle.
    */
@@ -144,11 +144,11 @@ public class VehicleProcessModelTO
     return this;
   }
 
-  public int getEnergyLevel() {
+  public double getEnergyLevel() {
     return energyLevel;
   }
 
-  public VehicleProcessModelTO setEnergyLevel(int energyLevel) {
+  public VehicleProcessModelTO setEnergyLevel(double energyLevel) {
     this.energyLevel = energyLevel;
     return this;
   }

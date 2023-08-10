@@ -19,14 +19,14 @@ public class SetEnergyLevelCommand
   /**
    * The energy level to set.
    */
-  private final int level;
+  private final double level;
 
   /**
    * Creates a new instance.
    *
    * @param level The energy level to set.
    */
-  public SetEnergyLevelCommand(int level) {
+  public SetEnergyLevelCommand(double level) {
     this.level = level;
   }
 

@@ -42,7 +42,7 @@ public class VehicleComparatorByEnergyLevel
    */
   @Override
   public int compare(Vehicle vehicle1, Vehicle vehicle2) {
-    return -Integer.compare(vehicle1.getEnergyLevel(), vehicle2.getEnergyLevel());
+    return -Double.compare(vehicle1.getEnergyLevel(), vehicle2.getEnergyLevel());
   }
 
 }

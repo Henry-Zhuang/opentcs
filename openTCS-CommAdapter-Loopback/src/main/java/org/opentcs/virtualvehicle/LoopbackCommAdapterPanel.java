@@ -197,8 +197,8 @@ public class LoopbackCommAdapterPanel
     SwingUtilities.invokeLater(() -> lHDCheckbox.setSelected(loaded));
   }
 
-  private void updateEnergyLevel(int energy) {
-    SwingUtilities.invokeLater(() -> energyLevelTxt.setText(Integer.toString(energy)));
+  private void updateEnergyLevel(double energy) {
+    SwingUtilities.invokeLater(() -> energyLevelTxt.setText(Double.toString(energy)));
   }
 
   private void updateCommAdapterEnabled(boolean isEnabled) {
@@ -1205,16 +1205,16 @@ private void chkBoxEnableActionPerformed(java.awt.event.ActionEvent evt) {//GEN-
         .setLabel(BUNDLE.getString("loopbackCommAdapterPanel.label_energyLevel.text"))
         .setUnitLabel("%")
         .setInitialValue(energyLevelTxt.getText())
-        .enableValidation(TextInputPanel.TextInputValidator.REGEX_INT_RANGE_0_100)
+        .enableValidation(TextInputPanel.TextInputValidator.REGEX_FLOAT_RANGE_0_100)
         .build();
     InputDialog dialog = new InputDialog(panel);
     dialog.setVisible(true);
     // Get result from dialog and set energy level
     if (dialog.getReturnStatus() == InputDialog.ReturnStatus.ACCEPTED) {
       String input = (String) dialog.getInput();
-      int energy;
+      double energy;
       try {
-        energy = Integer.parseInt(input);
+        energy = Math.min(Double.parseDouble(input), 100.0);
       }
       catch (NumberFormatException e) {
         return;

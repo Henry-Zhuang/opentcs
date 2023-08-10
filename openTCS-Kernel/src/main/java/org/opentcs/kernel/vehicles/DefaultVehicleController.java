@@ -816,7 +816,7 @@ public class DefaultVehicleController
     }
     else if (Objects.equals(evt.getPropertyName(),
                             VehicleProcessModel.Attribute.ENERGY_LEVEL.name())) {
-      vehicleService.updateVehicleEnergyLevel(vehicle.getReference(), (Integer) evt.getNewValue());
+      vehicleService.updateVehicleEnergyLevel(vehicle.getReference(), (Double) evt.getNewValue());
     }
     else if (Objects.equals(evt.getPropertyName(),
                             VehicleProcessModel.Attribute.LOAD_HANDLING_DEVICES.name())) {

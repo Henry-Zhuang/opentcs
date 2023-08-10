@@ -36,7 +36,7 @@ public class GetVehicleResponseTO {
 
   private int energyLevelCritical;
 
-  private int energyLevel;
+  private double energyLevel;
 
   private IntegrationLevel integrationLevel = IntegrationLevel.TO_BE_RESPECTED;
 
@@ -97,11 +97,11 @@ public class GetVehicleResponseTO {
     return this;
   }
 
-  public int getEnergyLevel() {
+  public double getEnergyLevel() {
     return energyLevel;
   }
 
-  public GetVehicleResponseTO setEnergyLevel(int energyLevel) {
+  public GetVehicleResponseTO setEnergyLevel(double energyLevel) {
     this.energyLevel = energyLevel;
     return this;
   }

@@ -165,7 +165,7 @@ public class DefaultVehicleControllerTest {
 
   @Test
   public void shouldForwardEnergyLevelChangeToKernel() {
-    int newLevel = 80;
+    double newLevel = 80;
     vehicleModel.setVehicleEnergyLevel(newLevel);
     verify(vehicleService).updateVehicleEnergyLevel(vehicle.getReference(),
                                                     newLevel);

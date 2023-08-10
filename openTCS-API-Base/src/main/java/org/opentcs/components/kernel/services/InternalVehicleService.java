@@ -32,7 +32,7 @@ public interface InternalVehicleService
    * @param energyLevel The vehicle's new energy level.
    * @throws ObjectUnknownException If the referenced vehicle does not exist.
    */
-  void updateVehicleEnergyLevel(TCSObjectReference<Vehicle> ref, int energyLevel)
+  void updateVehicleEnergyLevel(TCSObjectReference<Vehicle> ref, double energyLevel)
       throws ObjectUnknownException;
 
   /**

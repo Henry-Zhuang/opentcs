@@ -107,6 +107,10 @@ public abstract class TextInputPanel
      */
     public static final String REGEX_FLOAT_NEG = "-[0-9]+(\\.[0-9]+)?|0+(\\.0+)?";
     /**
+     * Regular expression that accepts a float in the interval [0,100].
+     */
+    public static final String REGEX_FLOAT_RANGE_0_100 = "([0-9]|[1-9][0-9]|100)(\\.[0-9]+)?";
+    /**
      * Regular expression that accepts any integer of arbitrary length.
      */
     public static final String REGEX_INT = "[-+]?[0-9]+";
