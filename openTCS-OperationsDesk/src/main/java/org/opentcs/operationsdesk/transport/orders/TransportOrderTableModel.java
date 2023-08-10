@@ -8,6 +8,8 @@
 package org.opentcs.operationsdesk.transport.orders;
 
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
@@ -33,34 +35,36 @@ public class TransportOrderTableModel
    * The index of the 'name' column.
    */
   public static final int COLUMN_NAME = 0;
+  public static final int COLUMN_TYPE = 1;
   /**
    * The index of the 'source' column.
    */
-  public static final int COLUMN_SOURCE = 1;
+  public static final int COLUMN_SOURCE = 2;
   /**
    * The index of the 'destination' column.
    */
-  public static final int COLUMN_DESTINATION = 2;
+  public static final int COLUMN_DESTINATION = 3;
   /**
    * The index of the 'intended vehicle' column.
    */
-  public static final int COLUMN_INTENDED_VEHICLE = 3;
+  public static final int COLUMN_INTENDED_VEHICLE = 4;
   /**
    * The index of the 'executing vehicle' column.
    */
-  public static final int COLUMN_EXECUTING_VEHICLE = 4;
+  public static final int COLUMN_EXECUTING_VEHICLE = 5;
   /**
    * The index of the 'status' column.
    */
-  public static final int COLUMN_STATUS = 5;
+  public static final int COLUMN_STATUS = 6;
   /**
    * The index of the 'order sequence' column.
    */
-  public static final int COLUMN_ORDER_SEQUENCE = 6;
+  public static final int COLUMN_ORDER_SEQUENCE = 7;
+  public static final int COLUMN_CREATION_TIME_STR = 7;
   /**
    * The index of the 'creation time' column.
    */
-  public static final int COLUMN_CREATION_TIME = 7;
+  public static final int COLUMN_CREATION_TIME = 8;
 
   private static final Logger LOG = LoggerFactory.getLogger(TransportOrderTableModel.class);
   /**
@@ -71,12 +75,14 @@ public class TransportOrderTableModel
 
   private static final String[] COLUMN_NAMES = new String[]{
     "Name",
+    "Type",
     BUNDLE.getString("transportOrderTableModel.column_source.headerText"),
     BUNDLE.getString("transportOrderTableModel.column_destination.headerText"),
     BUNDLE.getString("transportOrderTableModel.column_intendedVehicle.headerText"),
     BUNDLE.getString("transportOrderTableModel.column_executingVehicle.headerText"),
     "Status",
-    BUNDLE.getString("transportOrderTableModel.column_orderSequence.headerText"),
+//    BUNDLE.getString("transportOrderTableModel.column_orderSequence.headerText"),
+    "Created time",
     BUNDLE.getString("transportOrderTableModel.column_creationTime.headerText")
   };
 
@@ -90,6 +96,8 @@ public class TransportOrderTableModel
     String.class,
     String.class,
     String.class,
+    String.class,
+//    String.class,
     String.class,
     Instant.class
   };
@@ -123,6 +131,8 @@ public class TransportOrderTableModel
     switch (columnIndex) {
       case COLUMN_NAME:
         return entry.getName();
+      case COLUMN_TYPE:
+        return entry.getType();
       case COLUMN_SOURCE:
         if (driveOrders.size() == 1) {
           return "";
@@ -150,13 +160,17 @@ public class TransportOrderTableModel
         }
       case COLUMN_STATUS:
         return entry.getState().toString();
-      case COLUMN_ORDER_SEQUENCE:
-        if (entry.getWrappingSequence() != null) {
-          return entry.getWrappingSequence().getName();
-        }
-        else {
-          return "-";
-        }
+//      case COLUMN_ORDER_SEQUENCE:
+//        if (entry.getWrappingSequence() != null) {
+//          return entry.getWrappingSequence().getName();
+//        }
+//        else {
+//          return "-";
+//        }
+      case COLUMN_CREATION_TIME_STR:
+        return entry.getCreationTime()
+            .atOffset(ZoneOffset.of("+8"))
+            .format(DateTimeFormatter.ofPattern("yyyy/MM/d HH:mm:ss"));
       case COLUMN_CREATION_TIME:
         return entry.getCreationTime();
       default:
@@ -179,7 +193,7 @@ public class TransportOrderTableModel
     requireNonNull(orders, "orders");
 
     SwingUtilities.invokeLater(() -> {
-      // Notifiations of any change listeners must happen at the same time/in the same thread the
+      // Notifications of any change listeners must happen at the same time/in the same thread the
       // data behind the model is updated. Otherwise, there is a risk that listeners work with/
       // refer to outdated data, which can lead to runtime exceptions.
       entries.clear();
