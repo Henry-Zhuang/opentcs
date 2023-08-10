@@ -1,4 +1,4 @@
-package org.opentcs.virtualvehicle.rms.message;
+package org.opentcs.common.rms.message;
 
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -17,5 +17,24 @@ public class Result extends Message {
         private String barcode;
         private Integer errorCode;
         private Integer errorReason;
+    }
+
+    public enum ErrorCode {
+      SUCCEED,
+      FAIL
+    }
+
+    public enum ErrorReason {
+      NONE(0),
+      OTHER_REASON(100);
+
+      private final int value;
+      ErrorReason(int value) {
+        this.value = value;
+      }
+
+      public int getValue() {
+        return value;
+      }
     }
 }

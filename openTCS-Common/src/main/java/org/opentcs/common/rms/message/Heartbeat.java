@@ -1,4 +1,4 @@
-package org.opentcs.virtualvehicle.rms.message;
+package org.opentcs.common.rms.message;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Data;
