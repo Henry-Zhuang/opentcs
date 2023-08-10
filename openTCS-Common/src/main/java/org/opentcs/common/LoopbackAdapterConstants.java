@@ -9,7 +9,7 @@ package org.opentcs.common;
 
 /**
  * This interface provides access to vehicle-property keys that are used in both the
- * plant overview as well as in the kernel.
+ * plant overview and in the kernel.
  */
 public interface LoopbackAdapterConstants {
 
@@ -22,13 +22,17 @@ public interface LoopbackAdapterConstants {
    */
   String PROPKEY_OPERATING_TIME = "loopback:operatingTime";
   /**
+   * The key of the vehicle property that specifies the full recharging time.
+   */
+  String PROPKEY_FULL_RECHARGING_TIME = "loopback:fullRechargingTime";
+  /**
    * The key of the vehicle property that specifies which operation loads the load handling device.
    */
   String PROPKEY_LOAD_OPERATION = "loopback:loadOperation";
   /**
    * The default value of the load operation property.
    */
-  String PROPVAL_LOAD_OPERATION_DEFAULT = "Load cargo";
+  String PROPVAL_LOAD_OPERATION_DEFAULT = "pick";
   /**
    * The key of the vehicle property that specifies which operation unloads the load handling
    * device.
@@ -37,13 +41,13 @@ public interface LoopbackAdapterConstants {
   /**
    * The default value of the unload operation property.
    */
-  String PROPVAL_UNLOAD_OPERATION_DEFAULT = "Unload cargo";
+  String PROPVAL_UNLOAD_OPERATION_DEFAULT = "place";
   /**
    * The key of the vehicle property that specifies the maximum acceleration of a vehicle.
    */
   String PROPKEY_ACCELERATION = "loopback:acceleration";
   /**
-   * The key of the vehicle property that specifies the maximum decceleration of a vehicle.
+   * The key of the vehicle property that specifies the maximum deceleration of a vehicle.
    */
   String PROPKEY_DECELERATION = "loopback:deceleration";
 
