@@ -3,10 +3,14 @@ package org.opentcs.virtualvehicle.rms;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
-import org.opentcs.components.kernel.services.TransportOrderService;
+import org.opentcs.common.rms.SocketConstants;
+import org.opentcs.components.kernel.services.DispatcherService;
+import org.opentcs.components.kernel.services.InternalTransportOrderService;
+import org.opentcs.components.kernel.services.InternalVehicleService;
 import org.opentcs.data.model.Vehicle;
-import org.opentcs.drivers.vehicle.VehicleProcessModel;
-import org.opentcs.virtualvehicle.rms.message.Heartbeat;
+import org.opentcs.util.event.SimpleEventBus;
+import org.opentcs.common.rms.message.Heartbeat;
+import org.opentcs.virtualvehicle.LoopbackVehicleModel;
 
 import static org.mockito.Mockito.mock;
 
@@ -16,13 +20,18 @@ public class SocketClientTest {
 
   @Test
   public void startup() {
-    VehicleProcessModel vehicleModel = new VehicleProcessModel(new Vehicle("Vehicle-001"));
+    LoopbackVehicleModel vehicleModel = new LoopbackVehicleModel(
+        new Vehicle("Vehicle-001"), 3600000
+    );
     SocketClient
         client = new SocketClient(
         vehicleModel,
-        mock(TransportOrderService.class),
-        SocketConstants.TCP_SERVER_IP,
-        SocketConstants.TCP_SERVER_PORT
+        new SimpleEventBus(),
+        mock(InternalTransportOrderService.class),
+        mock(DispatcherService.class),
+        mock(InternalVehicleService.class),
+        SocketConstants.DEFAULT_SERVER_IP,
+        String.valueOf(SocketConstants.DEFAULT_SERVER_PORT)
     );
     client.enable();
     while (run) ;
