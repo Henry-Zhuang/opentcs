@@ -1,6 +1,6 @@
 /**
  * Copyright (c) The openTCS Authors.
- *
+ * <p>
  * This program is free software and subject to the MIT license. (For details,
  * see the licensing information (LICENSE.txt) you should have received with
  * this copy of the software.)
@@ -8,20 +8,28 @@
 package org.opentcs.virtualvehicle;
 
 import com.google.inject.assistedinject.Assisted;
+
 import java.beans.PropertyChangeEvent;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
+
 import static java.util.Objects.requireNonNull;
+
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import javax.inject.Inject;
+
 import org.opentcs.common.LoopbackAdapterConstants;
-import org.opentcs.components.kernel.services.TransportOrderService;
+import org.opentcs.common.rms.SocketConstants;
+import org.opentcs.components.kernel.services.DispatcherService;
+import org.opentcs.components.kernel.services.InternalTransportOrderService;
+import org.opentcs.components.kernel.services.InternalVehicleService;
+import org.opentcs.customizations.ApplicationEventBus;
 import org.opentcs.customizations.kernel.KernelExecutor;
 import org.opentcs.data.model.Vehicle;
 import org.opentcs.data.order.Route.Step;
@@ -34,9 +42,9 @@ import org.opentcs.drivers.vehicle.VehicleCommAdapter;
 import org.opentcs.drivers.vehicle.VehicleProcessModel;
 import org.opentcs.drivers.vehicle.management.VehicleProcessModelTO;
 import org.opentcs.util.ExplainedBoolean;
+import org.opentcs.util.event.EventSource;
 import org.opentcs.virtualvehicle.VelocityController.WayEntry;
 import org.opentcs.virtualvehicle.rms.SocketClient;
-import org.opentcs.virtualvehicle.rms.SocketConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -104,27 +112,36 @@ public class LoopbackCommunicationAdapter
   /**
    * Creates a new instance.
    *
-   * @param configuration This class's configuration.
-   * @param vehicle The vehicle this adapter is associated with.
+   * @param configuration  This class's configuration.
+   * @param vehicle        The vehicle this adapter is associated with.
    * @param kernelExecutor The kernel's executor.
    */
   @Inject
   public LoopbackCommunicationAdapter(VirtualVehicleConfiguration configuration,
                                       @Assisted Vehicle vehicle,
                                       @KernelExecutor ScheduledExecutorService kernelExecutor,
-                                      @Nonnull TransportOrderService orderService) {
-    super(new LoopbackVehicleModel(vehicle),
-          configuration.commandQueueCapacity(),
-          1,
-          configuration.rechargeOperation(),
-          kernelExecutor);
+                                      @ApplicationEventBus EventSource eventSource,
+                                      @Nonnull InternalTransportOrderService orderService,
+                                      @Nonnull DispatcherService dispatcherService,
+                                      @Nonnull InternalVehicleService vehicleService) {
+    super(new LoopbackVehicleModel(vehicle, configuration.defaultRechargingTime()),
+        configuration.commandQueueCapacity(),
+        1,
+        configuration.rechargeOperation(),
+        configuration.stopRechargeOperation(),
+        kernelExecutor);
     this.vehicle = requireNonNull(vehicle, "vehicle");
     this.configuration = requireNonNull(configuration, "configuration");
+    String serverIp = vehicle.getProperty(SocketConstants.PROPERTY_KEY_SERVER_IP);
+    String serverPort = vehicle.getProperty(SocketConstants.PROPERTY_KEY_SERVER_PORT);
     this.socketClient = new SocketClient(
         getProcessModel(),
+        eventSource,
         orderService,
-        SocketConstants.TCP_SERVER_IP,
-        SocketConstants.TCP_SERVER_PORT
+        dispatcherService,
+        vehicleService,
+        serverIp != null ? serverIp : configuration.socketServerIp(),
+        serverPort != null ? serverPort : configuration.socketServerPort()
     );
   }
 
@@ -144,6 +161,7 @@ public class LoopbackCommunicationAdapter
     getProcessModel().setVehicleLoadHandlingDevices(
         Arrays.asList(new LoadHandlingDevice(LHD_NAME, false))
     );
+    socketClient.initialize();
     initialized = true;
   }
 
@@ -157,6 +175,8 @@ public class LoopbackCommunicationAdapter
     if (!isInitialized()) {
       return;
     }
+
+    socketClient.terminate();
     super.terminate();
     initialized = false;
   }
@@ -169,13 +189,12 @@ public class LoopbackCommunicationAdapter
       return;
     }
     if (Objects.equals(evt.getPropertyName(),
-                       VehicleProcessModel.Attribute.LOAD_HANDLING_DEVICES.name())) {
+        VehicleProcessModel.Attribute.LOAD_HANDLING_DEVICES.name())) {
       if (!getProcessModel().getVehicleLoadHandlingDevices().isEmpty()
           && getProcessModel().getVehicleLoadHandlingDevices().get(0).isFull()) {
         loadState = LoadState.FULL;
         getProcessModel().setVehicleLength(configuration.vehicleLengthLoaded());
-      }
-      else {
+      } else {
         loadState = LoadState.EMPTY;
         getProcessModel().setVehicleLength(configuration.vehicleLengthUnloaded());
       }
@@ -265,15 +284,13 @@ public class LoopbackCommunicationAdapter
         if (nextOp.startsWith(getProcessModel().getLoadOperation())) {
           canProcess = false;
           reason = LOAD_OPERATION_CONFLICT;
-        }
-        else if (nextOp.startsWith(getProcessModel().getUnloadOperation())) {
+        } else if (nextOp.startsWith(getProcessModel().getUnloadOperation())) {
           loaded = false;
         }
       } // If we're not loaded, we could load, but not unload.
       else if (nextOp.startsWith(getProcessModel().getLoadOperation())) {
         loaded = true;
-      }
-      else if (nextOp.startsWith(getProcessModel().getUnloadOperation())) {
+      } else if (nextOp.startsWith(getProcessModel().getUnloadOperation())) {
         canProcess = false;
         reason = UNLOAD_OPERATION_CONFLICT;
       }
@@ -332,21 +349,20 @@ public class LoopbackCommunicationAdapter
     if (step.getPath() == null) {
       LOG.debug("Starting operation simulation...");
       ((ScheduledExecutorService) getExecutor()).schedule(() -> operationSimulation(command),
-                                                          SIMULATION_TASKS_DELAY,
-                                                          TimeUnit.MILLISECONDS);
-    }
-    else {
+          SIMULATION_TASKS_DELAY,
+          TimeUnit.MILLISECONDS);
+    } else {
       getProcessModel().getVelocityController().addWayEntry(
           new WayEntry(step.getPath().getLength(),
-                       maxVelocity(step),
-                       step.getDestinationPoint().getName(),
-                       step.getVehicleOrientation())
+              maxVelocity(step),
+              step.getDestinationPoint().getName(),
+              step.getVehicleOrientation())
       );
 
       LOG.debug("Starting movement simulation...");
       ((ScheduledExecutorService) getExecutor()).schedule(() -> movementSimulation(command),
-                                                          SIMULATION_TASKS_DELAY,
-                                                          TimeUnit.MILLISECONDS);
+          SIMULATION_TASKS_DELAY,
+          TimeUnit.MILLISECONDS);
     }
   }
 
@@ -363,14 +379,14 @@ public class LoopbackCommunicationAdapter
 
     WayEntry prevWayEntry = getProcessModel().getVelocityController().getCurrentWayEntry();
     getProcessModel().getVelocityController().advanceTime(getSimulationTimeStep());
+    energyConsumeSimulation(getSimulationTimeStep());  // 模拟电量消耗
     WayEntry currentWayEntry = getProcessModel().getVelocityController().getCurrentWayEntry();
     //if we are still on the same way entry then reschedule to do it again
     if (prevWayEntry == currentWayEntry) {
       ((ScheduledExecutorService) getExecutor()).schedule(() -> movementSimulation(command),
-                                                          SIMULATION_TASKS_DELAY,
-                                                          TimeUnit.MILLISECONDS);
-    }
-    else {
+          SIMULATION_TASKS_DELAY,
+          TimeUnit.MILLISECONDS);
+    } else {
       //if the way enties are different then we have finished this step
       //and we can move on.
       getProcessModel().setVehiclePosition(prevWayEntry.getDestPointName());
@@ -378,25 +394,48 @@ public class LoopbackCommunicationAdapter
       if (!command.isWithoutOperation()) {
         LOG.debug("Starting operation simulation...");
         ((ScheduledExecutorService) getExecutor()).schedule(() -> operationSimulation(command),
-                                                            SIMULATION_TASKS_DELAY,
-                                                            TimeUnit.MILLISECONDS);
-      }
-      else {
+            SIMULATION_TASKS_DELAY,
+            TimeUnit.MILLISECONDS);
+      } else {
         finishVehicleSimulation(command);
       }
     }
   }
 
   private void operationSimulation(MovementCommand command) {
+    LOG.debug("operation: {}", command.getOperation());
+    if (command.getOperation().equals(getRechargeOperation()))
+      rechargeSimulation(command);
+    else if (command.getOperation().equals(getStopRechargeOperation()))
+      stopRechargeSimulation(command);
+    else
+      loadUnloadOperationSimulation(command);
+  }
+
+  private void rechargeSimulation(MovementCommand command) {
+    getProcessModel().setVehicleState(Vehicle.State.CHARGING);
+    getProcessModel().setChargerConnected(true);
+    ((ScheduledExecutorService) getExecutor()).schedule(() -> energyGrowSimulation(getSimulationTimeStep()),
+        SIMULATION_TASKS_DELAY,
+        TimeUnit.MILLISECONDS);
+    finishVehicleSimulation(command);
+  }
+
+  private void stopRechargeSimulation(MovementCommand command) {
+    getProcessModel().setChargerConnected(false);
+    finishVehicleSimulation(command);
+  }
+
+  private void loadUnloadOperationSimulation(MovementCommand command) {
     operationSimulationTimePassed += getSimulationTimeStep();
 
     if (operationSimulationTimePassed < getProcessModel().getOperatingTime()) {
       getProcessModel().getVelocityController().advanceTime(getSimulationTimeStep());
+      energyConsumeSimulation(getSimulationTimeStep());  // 模拟电量消耗
       ((ScheduledExecutorService) getExecutor()).schedule(() -> operationSimulation(command),
-                                                          SIMULATION_TASKS_DELAY,
-                                                          TimeUnit.MILLISECONDS);
-    }
-    else {
+          SIMULATION_TASKS_DELAY,
+          TimeUnit.MILLISECONDS);
+    } else {
       LOG.debug("Operation simulation finished.");
       String operation = command.getOperation();
       if (operation.equals(getProcessModel().getLoadOperation())) {
@@ -404,8 +443,7 @@ public class LoopbackCommunicationAdapter
         getProcessModel().setVehicleLoadHandlingDevices(
             Arrays.asList(new LoadHandlingDevice(LHD_NAME, true))
         );
-      }
-      else if (operation.equals(getProcessModel().getUnloadOperation())) {
+      } else if (operation.equals(getProcessModel().getUnloadOperation())) {
         getProcessModel().setVehicleLoadHandlingDevices(
             Arrays.asList(new LoadHandlingDevice(LHD_NAME, false))
         );
@@ -414,20 +452,46 @@ public class LoopbackCommunicationAdapter
     }
   }
 
+  private void energyGrowSimulation(double chargingTime) {
+    if (!getProcessModel().isChargerConnected())
+      return;
+
+    double oriEnergyLevel = getProcessModel().getVehicleEnergyLevel();
+    if (oriEnergyLevel < 100){
+      double increment = (chargingTime / getProcessModel().getFullRechargingTime()) * 100;
+      double curEnergyLevel = Math.min(oriEnergyLevel + increment, 100.0);
+      getProcessModel().setVehicleEnergyLevel(curEnergyLevel);
+    }
+    ((ScheduledExecutorService) getExecutor()).schedule(() -> energyGrowSimulation(getSimulationTimeStep()),
+        SIMULATION_TASKS_DELAY,
+        TimeUnit.MILLISECONDS);
+  }
+
+  private void energyConsumeSimulation(int runningTime) {
+    double oriEnergyLevel = getProcessModel().getVehicleEnergyLevel();
+    if (oriEnergyLevel <= 0.0)
+      return;
+    double decrement = (((double) runningTime) / getProcessModel().getFullRunningTime()) * 100;
+    double curEnergyLevel = Math.max(oriEnergyLevel - decrement, 0.0);
+    getProcessModel().setVehicleEnergyLevel(curEnergyLevel);
+  }
+
   private void finishVehicleSimulation(MovementCommand command) {
     //Set the vehicle state to idle
-    if (getSentQueue().size() <= 1 && getCommandQueue().isEmpty()) {
+    if (getSentQueue().size() <= 1
+        && getCommandQueue().isEmpty()
+        && !command.getOperation().equals(getRechargeOperation())
+    ) {
       getProcessModel().setVehicleState(Vehicle.State.IDLE);
     }
     if (Objects.equals(getSentQueue().peek(), command)) {
       // Let the comm adapter know we have finished this command.
       getProcessModel().commandExecuted(getSentQueue().poll());
-    }
-    else {
+    } else {
       LOG.warn("{}: Simulated command not oldest in sent queue: {} != {}",
-               getName(),
-               command,
-               getSentQueue().peek());
+          getName(),
+          command,
+          getSentQueue().peek());
     }
     isSimulationRunning = false;
   }

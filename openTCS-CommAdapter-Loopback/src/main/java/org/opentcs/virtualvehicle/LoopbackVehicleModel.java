@@ -1,6 +1,6 @@
 /**
  * Copyright (c) The openTCS Authors.
- *
+ * <p>
  * This program is free software and subject to the MIT license. (For details,
  * see the licensing information (LICENSE.txt) you should have received with
  * this copy of the software.)
@@ -8,6 +8,7 @@
 package org.opentcs.virtualvehicle;
 
 import javax.annotation.Nonnull;
+
 import org.opentcs.common.LoopbackAdapterConstants;
 import org.opentcs.data.model.Vehicle;
 import org.opentcs.drivers.vehicle.VehicleProcessModel;
@@ -25,6 +26,10 @@ public class LoopbackVehicleModel
    */
   private boolean singleStepModeEnabled;
   /**
+   * Indicates whether this virtual vehicle is connected to a charger or not.
+   */
+  private volatile boolean chargerConnected = false;
+  /**
    * Indicates which operation is a loading operation.
    */
   private final String loadOperation;
@@ -37,6 +42,14 @@ public class LoopbackVehicleModel
    */
   private int operatingTime;
   /**
+   * The time it takes for the robot to recharge from empty energy to full energy (ms).
+   */
+  private double fullRechargingTime;
+  /**
+   * The time it takes for the robot to run from full energy to empty energy (ms).
+   */
+  private double fullRunningTime;
+  /**
    * The velocity controller for calculating the simulated vehicle's velocity and current position.
    */
   private final VelocityController velocityController;
@@ -45,13 +58,16 @@ public class LoopbackVehicleModel
    */
   private final VelocityHistory velocityHistory = new VelocityHistory(100, 10);
 
-  public LoopbackVehicleModel(Vehicle attachedVehicle) {
+  public LoopbackVehicleModel(Vehicle attachedVehicle,
+                              double defaultRechargeTime) {
     super(attachedVehicle);
     this.velocityController = new VelocityController(parseDeceleration(attachedVehicle),
-                                                     parseAcceleration(attachedVehicle),
-                                                     attachedVehicle.getMaxReverseVelocity(),
-                                                     attachedVehicle.getMaxVelocity());
+        parseAcceleration(attachedVehicle),
+        attachedVehicle.getMaxReverseVelocity(),
+        attachedVehicle.getMaxVelocity());
     this.operatingTime = parseOperatingTime(attachedVehicle);
+    this.fullRechargingTime = parseRechargingTime(attachedVehicle, defaultRechargeTime);
+    this.fullRunningTime = 4 * this.fullRechargingTime;
     this.loadOperation = extractLoadOperation(attachedVehicle);
     this.unloadOperation = extractUnloadOperation(attachedVehicle);
   }
@@ -68,15 +84,15 @@ public class LoopbackVehicleModel
    * Sets this communication adapter's <em>single step mode</em> flag.
    *
    * @param mode If <code>true</code>, sets this adapter to single step mode,
-   * otherwise sets this adapter to flow mode.
+   *             otherwise sets this adapter to flow mode.
    */
   public synchronized void setSingleStepModeEnabled(final boolean mode) {
     boolean oldValue = singleStepModeEnabled;
     singleStepModeEnabled = mode;
 
     getPropertyChangeSupport().firePropertyChange(Attribute.SINGLE_STEP_MODE.name(),
-                                                  oldValue,
-                                                  mode);
+        oldValue,
+        mode);
   }
 
   /**
@@ -108,8 +124,54 @@ public class LoopbackVehicleModel
     this.operatingTime = defaultOperatingTime;
 
     getPropertyChangeSupport().firePropertyChange(Attribute.OPERATING_TIME.name(),
-                                                  oldValue,
-                                                  defaultOperatingTime);
+        oldValue,
+        defaultOperatingTime);
+  }
+
+  /**
+   * Returns the full recharging time.
+   *
+   * @return The full recharging time
+   */
+  public synchronized double getFullRechargingTime() {
+    return fullRechargingTime;
+  }
+
+  /**
+   * Sets the full recharging time.
+   *
+   * @param fullRechargingTime The new full recharging time
+   */
+  public synchronized void setFullRechargingTime(double fullRechargingTime) {
+    double oldValue = this.fullRechargingTime;
+    this.fullRechargingTime = fullRechargingTime;
+
+    getPropertyChangeSupport().firePropertyChange(Attribute.FULL_RECHARGING_TIME.name(),
+        oldValue,
+        fullRechargingTime);
+  }
+
+  /**
+   * Returns the full running time.
+   *
+   * @return The full running time
+   */
+  public synchronized double getFullRunningTime() {
+    return fullRunningTime;
+  }
+
+  /**
+   * Sets the full running time.
+   *
+   * @param fullRunningTime The new full running time
+   */
+  public synchronized void setFullRunningTime(double fullRunningTime) {
+    double oldValue = this.fullRunningTime;
+    this.fullRunningTime = fullRunningTime;
+
+    getPropertyChangeSupport().firePropertyChange(Attribute.FULL_RUNNING_TIME.name(),
+        oldValue,
+        fullRunningTime);
   }
 
   /**
@@ -131,8 +193,8 @@ public class LoopbackVehicleModel
     velocityController.setMaxDeceleration(maxDeceleration);
 
     getPropertyChangeSupport().firePropertyChange(Attribute.DECELERATION.name(),
-                                                  oldValue,
-                                                  maxDeceleration);
+        oldValue,
+        maxDeceleration);
   }
 
   /**
@@ -154,8 +216,8 @@ public class LoopbackVehicleModel
     velocityController.setMaxAcceleration(maxAcceleration);
 
     getPropertyChangeSupport().firePropertyChange(Attribute.ACCELERATION.name(),
-                                                  oldValue,
-                                                  maxAcceleration);
+        oldValue,
+        maxAcceleration);
   }
 
   /**
@@ -177,8 +239,8 @@ public class LoopbackVehicleModel
     velocityController.setMaxRevVelocity(maxRevVelocity);
 
     getPropertyChangeSupport().firePropertyChange(Attribute.MAX_REVERSE_VELOCITY.name(),
-                                                  oldValue,
-                                                  maxRevVelocity);
+        oldValue,
+        maxRevVelocity);
   }
 
   /**
@@ -200,8 +262,8 @@ public class LoopbackVehicleModel
     velocityController.setMaxFwdVelocity(maxFwdVelocity);
 
     getPropertyChangeSupport().firePropertyChange(Attribute.MAX_FORWARD_VELOCITY.name(),
-                                                  oldValue,
-                                                  maxFwdVelocity);
+        oldValue,
+        maxFwdVelocity);
   }
 
   /**
@@ -223,8 +285,16 @@ public class LoopbackVehicleModel
     velocityController.setVehiclePaused(pause);
 
     getPropertyChangeSupport().firePropertyChange(Attribute.VEHICLE_PAUSED.name(),
-                                                  oldValue,
-                                                  pause);
+        oldValue,
+        pause);
+  }
+
+  public synchronized boolean isChargerConnected() {
+    return chargerConnected;
+  }
+
+  public synchronized void setChargerConnected(boolean chargerConnected) {
+    this.chargerConnected = chargerConnected;
   }
 
   /**
@@ -253,14 +323,27 @@ public class LoopbackVehicleModel
     velocityHistory.addVelocityValue(velocityValue);
     // ...and let all observers know about it.
     getPropertyChangeSupport().firePropertyChange(Attribute.VELOCITY_HISTORY.name(),
-                                                  null,
-                                                  velocityHistory);
+        null,
+        velocityHistory);
   }
 
   private int parseOperatingTime(Vehicle vehicle) {
     String opTime = vehicle.getProperty(LoopbackAdapterConstants.PROPKEY_OPERATING_TIME);
     // Ensure it's a positive value.
     return Math.max(Parsers.tryParseString(opTime, 5000), 1);
+  }
+
+  private double parseRechargingTime(Vehicle vehicle, double defaultTime) {
+    String rechargeTime = vehicle.getProperty(LoopbackAdapterConstants.PROPKEY_FULL_RECHARGING_TIME);
+    try {
+      if (rechargeTime != null) {
+        double reTime = Double.parseDouble(rechargeTime);
+        return reTime > 0 ? reTime : defaultTime;
+      }
+    } catch (NumberFormatException e) {
+      return defaultTime;
+    }
+    return defaultTime;
   }
 
   /**
@@ -276,10 +359,10 @@ public class LoopbackVehicleModel
   }
 
   /**
-   * Gets the maximum decceleration. If the user did not specify any, 1000(m/s²) is returned.
+   * Gets the maximum deceleration. If the user did not specify any, 1000(m/s²) is returned.
    *
    * @param vehicle the vehicle
-   * @return the maximum decceleration.
+   * @return the maximum deceleration.
    */
   private int parseDeceleration(Vehicle vehicle) {
     String deceleration = vehicle.getProperty(LoopbackAdapterConstants.PROPKEY_DECELERATION);
@@ -315,6 +398,14 @@ public class LoopbackVehicleModel
      * Indicates a change of the virtual vehicle's default operating time.
      */
     OPERATING_TIME,
+    /**
+     * Indicates a change of the virtual vehicle's full recharging time.
+     */
+    FULL_RECHARGING_TIME,
+    /**
+     * Indicates a change of the virtual vehicle's full running time.
+     */
+    FULL_RUNNING_TIME,
     /**
      * Indicates a change of the virtual vehicle's maximum acceleration.
      */

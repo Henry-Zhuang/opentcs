@@ -11,22 +11,25 @@ import io.netty.handler.codec.ByteToMessageDecoder;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.MessageToByteEncoder;
 import io.netty.util.CharsetUtil;
-import org.opentcs.virtualvehicle.rms.message.*;
+import lombok.NonNull;
+import org.opentcs.common.rms.message.*;
 
-import javax.annotation.Nonnull;
 import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 
 import static java.util.Objects.requireNonNull;
 
 class SocketClientInitializer extends ChannelInitializer<SocketChannel> {
   private static final ObjectMapper objectMapper = new ObjectMapper();
   private final SocketClient socketClient;
-
-  public SocketClientInitializer(@Nonnull SocketClient socketClient) {
+  private final ScheduledThreadPoolExecutor scheduledTimer;
+  public SocketClientInitializer(@NonNull SocketClient socketClient,
+                                 @NonNull ScheduledThreadPoolExecutor scheduledTimer) {
     this.socketClient = requireNonNull(socketClient, "socketClient");
+    this.scheduledTimer = scheduledTimer;
   }
 
   @Override
@@ -43,7 +46,7 @@ class SocketClientInitializer extends ChannelInitializer<SocketChannel> {
     ));
     pipeline.addLast(new ClientMessageEncoder());
     pipeline.addLast(new ClientMessageDecoder());
-    pipeline.addLast(new SocketClientHandler(socketClient));
+    pipeline.addLast(new SocketClientHandler(socketClient, scheduledTimer));
   }
 
   private static class ClientMessageEncoder extends MessageToByteEncoder<Message> {

@@ -6,48 +6,122 @@ import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.util.concurrent.DefaultThreadFactory;
-import io.netty.util.concurrent.Future;
-import io.netty.util.concurrent.ScheduledFuture;
-import org.opentcs.components.kernel.services.TransportOrderService;
-import org.opentcs.data.model.Point;
+import lombok.Data;
+import lombok.NonNull;
+import org.opentcs.access.to.order.DestinationCreationTO;
+import org.opentcs.access.to.order.TransportOrderCreationTO;
+import org.opentcs.common.rms.NameConvertor;
+import org.opentcs.common.rms.SocketConstants;
+import org.opentcs.common.rms.message.*;
+import org.opentcs.components.Lifecycle;
+import org.opentcs.components.kernel.services.DispatcherService;
+import org.opentcs.components.kernel.services.InternalTransportOrderService;
+import org.opentcs.components.kernel.services.InternalVehicleService;
+import org.opentcs.customizations.ApplicationEventBus;
 import org.opentcs.data.model.Vehicle;
-import org.opentcs.drivers.vehicle.VehicleProcessModel;
-import org.opentcs.virtualvehicle.rms.message.*;
+import org.opentcs.data.order.OrderConstants;
+import org.opentcs.data.order.TransportOrder;
+import org.opentcs.drivers.vehicle.rms.OrderFinalStateEvent;
+import org.opentcs.util.event.EventHandler;
+import org.opentcs.util.event.EventSource;
+import org.opentcs.virtualvehicle.LoopbackVehicleModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nonnull;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import static java.util.Objects.requireNonNull;
+import static org.opentcs.data.order.DriveOrder.Destination.OP_NOP;
+import static org.opentcs.util.Assertions.checkArgument;
 import static org.opentcs.util.Assertions.checkInRange;
 
-public class SocketClient {
+public class SocketClient implements EventHandler, Lifecycle {
   /**
    * This class's Logger.
    */
   public static final Logger LOG = LoggerFactory.getLogger(SocketClient.class);
-  private final TransportOrderService orderService;
-  private final VehicleProcessModel vehicleModel;
+  private final EventSource eventSource;
+  private final InternalTransportOrderService orderService;
+  private final DispatcherService dispatcherService;
+  private final InternalVehicleService vehicleService;
+  private final LoopbackVehicleModel vehicleModel;
   private final String serverHost;
   private final int serverPort;
+  private ScheduledThreadPoolExecutor scheduledTimer;
   private EventLoopGroup workerGroup;
   private Bootstrap bootstrap;
   private Channel channel;
+  private boolean initialized = false;
   private volatile boolean enabled = false;
   protected ConcurrentHashMap<UnsignedLong, MessageWrapper> resendTable;
 
-  public SocketClient(@Nonnull VehicleProcessModel vehicleModel,
-                      @Nonnull TransportOrderService orderService,
-                      @Nonnull String serverHost,
-                      int serverPort) {
-    this.vehicleModel = requireNonNull(vehicleModel, "vehicleModel");
-    this.orderService = requireNonNull(orderService, "orderService");
-    this.serverHost = requireNonNull(serverHost, "serverHost");
-    this.serverPort = checkInRange(serverPort, 1, 65535, "serverPort");
+  public SocketClient(@NonNull LoopbackVehicleModel vehicleModel,
+                      @ApplicationEventBus EventSource eventSource,
+                      @NonNull InternalTransportOrderService orderService,
+                      @NonNull DispatcherService dispatcherService,
+                      @NonNull InternalVehicleService vehicleService,
+                      String serverHost,
+                      String serverPort) {
+    this.vehicleModel = vehicleModel;
+    this.eventSource = eventSource;
+    this.orderService = orderService;
+    this.dispatcherService = dispatcherService;
+    this.vehicleService = vehicleService;
+    this.serverHost = serverHost != null ? serverHost : SocketConstants.DEFAULT_SERVER_IP;
+    this.serverPort = serverPort != null ?
+        checkInRange(Integer.parseInt(serverPort), 1, 65535, "serverPort")
+        : SocketConstants.DEFAULT_SERVER_PORT;
+  }
+
+  @Override
+  public void initialize() {
+    if (isInitialized()) {
+      return;
+    }
+
+    scheduledTimer = new ScheduledThreadPoolExecutor(
+        2, new DefaultThreadFactory(String.format("%s_Timer", getVehicleName()), true)
+    );
+    workerGroup = new NioEventLoopGroup(
+        4, new DefaultThreadFactory(String.format("%s_Socket", getVehicleName()), true)
+    );
+    bootstrap = new Bootstrap();
+    bootstrap.group(workerGroup)
+        .channel(NioSocketChannel.class)
+        .option(ChannelOption.TCP_NODELAY, true)
+        .option(ChannelOption.SO_KEEPALIVE, true)
+        .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, SocketConstants.CONNECT_TIMEOUT)
+        .handler(new SocketClientInitializer(this, scheduledTimer));
+    //    ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.ADVANCED);
+    LOG.debug("Robot socket initialized: {}", getVehicleName());
+    initialized = true;
+  }
+
+  @Override
+  public boolean isInitialized() {
+    return initialized;
+  }
+
+  @Override
+  public void terminate() {
+    if (!isInitialized()) {
+      return;
+    }
+
+    scheduledTimer.shutdown();
+    workerGroup.shutdownGracefully();
+//    Future<?> future = workerGroup.shutdownGracefully();
+//    try {
+//      future.await(2, TimeUnit.SECONDS);
+//    } catch (InterruptedException e) {
+//      LOG.error("{}: Terminate exception: ", getVehicleName(), e);
+//    }
+    LOG.debug("Robot socket terminated: {}", getVehicleName());
+    initialized = false;
   }
 
   public synchronized void enable() {
@@ -56,19 +130,7 @@ public class SocketClient {
     }
 
     resendTable = new ConcurrentHashMap<UnsignedLong, MessageWrapper>(256);
-
-    workerGroup = new NioEventLoopGroup(
-        4, new DefaultThreadFactory(String.format("%s_SocketClient", vehicleModel.getName()), true)
-    );
-    bootstrap = new Bootstrap();
-
-    bootstrap.group(workerGroup)
-        .channel(NioSocketChannel.class)
-        .option(ChannelOption.TCP_NODELAY, true)
-        .option(ChannelOption.SO_KEEPALIVE, true)
-        .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, SocketConstants.CONNECT_TIMEOUT)
-        .handler(new SocketClientInitializer(this));
-
+    eventSource.subscribe(this);
     enabled = true;
     connect();
   }
@@ -77,6 +139,8 @@ public class SocketClient {
     if (!isEnabled()) {
       return;
     }
+    eventSource.unsubscribe(this);
+
     enabled = false;
     disconnect();
     resendTable.clear();
@@ -96,70 +160,28 @@ public class SocketClient {
     try {
       cf.await(SocketConstants.CONNECT_TIMEOUT, TimeUnit.SECONDS);
       if (cf.isSuccess()) {
-        LOG.info("{}: Connected to RMS tcp server({}:{})", vehicleModel.getName(), serverHost, serverPort);
+        LOG.info("{}: Connected to RMS tcp server({}:{})", getVehicleName(), serverHost, serverPort);
         channel = cf.channel();
-      } else {
-        if (!isEnabled()) {
-          workerGroup.shutdownGracefully();
-        } else {
-          LOG.info("{}: Reconnecting to RMS tcp server......", vehicleModel.getName());
-          workerGroup.schedule(this::connect, getReconnectDelayTime(), TimeUnit.SECONDS);
-        }
+      } else if (isEnabled()) {
+        LOG.info("{}: Reconnecting to RMS tcp server({}:{})......", getVehicleName(), serverHost, serverPort);
+        workerGroup.schedule(this::connect, getReconnectDelayTime(), TimeUnit.SECONDS);
       }
     } catch (InterruptedException ex) {
-      LOG.error(String.format("%s: Connect to RMS tcp server exception: ", vehicleModel.getName()), ex);
+      LOG.error("{}: Connect to RMS tcp server exception: ", getVehicleName(), ex);
     }
   }
 
   public synchronized void disconnect() {
-    if (workerGroup.isShuttingDown()) {
+    if (channel == null || !channel.isOpen()) {
       return;
     }
 
-    Future<?> future = workerGroup.shutdownGracefully();
-    try {
-      future.await(5, TimeUnit.SECONDS);
-    } catch (InterruptedException e) {
-      LOG.error(String.format("%s: Disconnect exception: ", vehicleModel.getName()), e);
-    }
-    if (channel != null) {
-      channel.close();
-      LOG.info("{}: Disconnected from RMS tcp server({}:{})", vehicleModel.getName(), serverHost, serverPort);
-    }
+    channel.close();
+    LOG.info("{}: Disconnected from RMS tcp server({}:{})", getVehicleName(), serverHost, serverPort);
   }
 
   public String getVehicleName() {
     return vehicleModel.getName();
-  }
-
-  public void processReceivedAck(Message msg) {
-    Response ack = msg instanceof Response ? (Response) msg : null;
-    if (ack != null) {
-      LOG.info("{}: Ack received:{}", vehicleModel.getName(), ack);
-      final UnsignedLong uniqueID = ack.getParams().getUniqueID();
-      if (uniqueID != null) {
-        final MessageWrapper msgWrapper = resendTable.get(uniqueID);
-        if (msgWrapper != null) {
-          msgWrapper.setAckSuccess(true);
-          msgWrapper.releaseAck();
-          resendTable.remove(uniqueID);
-        } else {
-          LOG.warn(
-              "{}: Ack for message[{}] was received but not required",
-              vehicleModel.getName(),
-              ack.getParams().getUniqueID()
-          );
-        }
-      }
-    }
-  }
-
-  public void processReceivedCommand(Message msg) {
-    Command cmd = msg instanceof Command ? (Command) msg : null;
-    if (cmd != null) {
-      LOG.info("{}: Command received:{}", vehicleModel.getName(), cmd);
-
-    }
   }
 
   public void scanResendTable() {
@@ -176,78 +198,290 @@ public class SocketClient {
             msgWrapper.releaseAll();
             it.remove();
             // 消息重发
-            Message msg = msgWrapper.getMsg();
-            boolean needAck = msg.getHeader().getMsgMode() == (byte) 1;
-            send(msg, needAck, false);
-            LOG.info(String.format("%s: Resend message: %s", vehicleModel.getName(), msg));
+            send(msgWrapper.getMsg(), false);
+            LOG.info("{}: Resend message: {}", getVehicleName(), msgWrapper.getMsg());
           }
         }
       }
     } catch (Throwable e) {
-      LOG.error(String.format("%s: scanResendTable exception: ", vehicleModel.getName()), e);
+      LOG.error("{}: ScanResendTable exception: ", getVehicleName(), e);
     }
   }
 
-  public void sendVehicleHeartbeat() {
-    Heartbeat.HeartbeatParams hbParams = new Heartbeat.HeartbeatParams();
-
-    hbParams.setRobotID(ObjectNameConvertor.toObjectId(Vehicle.class, vehicleModel.getName()));
-    hbParams.setStatus(0);
-    hbParams.setPosition(ObjectNameConvertor.toObjectId(Point.class, vehicleModel.getVehiclePosition()));
-    double theta = vehicleModel.getVehicleOrientationAngle();
-    if (!Double.isNaN(theta)) {
-      hbParams.setTheta(theta);
-    }
-    hbParams.setOdo(10.0);
-    hbParams.setToday_odo(20.0);
-    Heartbeat.HeartbeatParams.BatteryInfo batteryInfo = new Heartbeat.HeartbeatParams.BatteryInfo();
-    batteryInfo.setPercentage((double) vehicleModel.getVehicleEnergyLevel());
-    hbParams.setBatteryInfo(batteryInfo);
-
-    Heartbeat hb = new Heartbeat();
-    hb.setDeviceType(1);
-    hb.setChannel(2);
-    hb.setType("heartbeat");
-    hb.setParams(hbParams);
-    sendHeartbeat(hb);
-  }
-
-
-  public boolean sendAck(@Nonnull Response ack) {
-    return send(ack, false, false);
-  }
-
-  public boolean sendResult(@Nonnull Result result) {
-    if (isImmediateCommand(result)) {  // 即时指令的执行结果不需要应答
-      return send(result, false, false);
-    } else {
-      return send(result, true, false);
+  @Override
+  public void onEvent(Object event) {
+    if (event instanceof OrderFinalStateEvent
+        && getVehicleName().equals(((OrderFinalStateEvent) event).getVehicleName())) {
+      OrderFinalStateEvent evt = (OrderFinalStateEvent) event;
+      if (evt.getOrderType().equals(OrderConstants.TYPE_NONE))
+        return;
+      int errorCode = evt.getFinalState().equals(TransportOrder.State.FINISHED) ?
+          Result.ErrorCode.SUCCEED.ordinal() : Result.ErrorCode.FAIL.ordinal();
+      int errorReason = errorCode == 0 ?
+          Result.ErrorReason.NONE.getValue() : Result.ErrorReason.OTHER_REASON.getValue();
+      sendResult(
+          NameConvertor.toCommandId(evt.getOrderName()),
+          Command.Type.fromString(evt.getOrderType()),
+          errorCode,
+          errorReason,
+          null, // TODO pick和place指令需要比较数据库与指令要求的barcode，若不同，则应返回actualBarcode
+          false);
     }
   }
 
-  private boolean sendHeartbeat(@Nonnull Heartbeat hb) {
-    return send(hb, false, false);
+  public void processReceivedAck(Message msg) {
+    if (msg instanceof Response) {
+      Response ack = (Response) msg;
+      LOG.info("{}: Ack received: {}", getVehicleName(), ack);
+      final UnsignedLong uniqueID = ack.getParams().getUniqueID();
+      if (uniqueID != null) {
+        final MessageWrapper msgWrapper = resendTable.get(uniqueID);
+        if (msgWrapper != null) {
+          resendTable.remove(uniqueID);
+          msgWrapper.setAckSuccess(true);
+          msgWrapper.releaseAck();
+        } else {
+          LOG.warn(
+              "{}: Ack for message[{}] was received but not required",
+              getVehicleName(),
+              ack.getParams().getUniqueID()
+          );
+        }
+      }
+    }
   }
 
-  private boolean send(@Nonnull Message msg, boolean needAck, boolean await) {
-    // 添加报文头部
-    final Message.Header header = new Message.Header();
-    header.setMsgSeq(UUID.randomUUID().toString().replace("-", ""));
-    header.setMsgMode(needAck ? (byte) 1 : (byte) 0);
-    msg.setHeader(header);
-    // 发送报文
-    final ChannelFuture channelFuture = channel.writeAndFlush(msg);
+  public void processReceivedCommand(Message msg) {
+    if (msg instanceof Command) {
+      Command cmd = (Command) msg;
+      LOG.info("{}: {} command received: {}", getVehicleName(), cmd.getType(), cmd);
+      try {
+        switch (cmd.getChannel()) {
+          case 0:
+            handleControlCommand(cmd);
+            break;
+          case 1:
+            handleManagementCommand(cmd);
+            break;
+          default:
+            LOG.warn("{}: Received invalid channel command: {}", getVehicleName(), cmd);
+        }
+      } catch (Throwable e) {
+        LOG.error("{}: {} command exception: ", getVehicleName(), cmd.getType(), e);
+        sendResult(
+            cmd.getParams().getUniqueID(),
+            Command.Type.fromString(cmd.getType()),
+            Result.ErrorCode.FAIL.ordinal(),
+            Result.ErrorReason.OTHER_REASON.getValue(),
+            null,
+            false);
+      }
+    }
+  }
 
+  private void handleControlCommand(Command cmd) {
+    // 参数检验
+    requireNonNull(cmd.getParams().getUniqueID(), "uniqueId");
+    // 执行指令
+    switch (Command.Type.fromString(requireNonNull(cmd.getType(), "cmdType"))) {
+      case PICK:
+      case PLACE:
+      case JOINT:
+        executePickPlaceJoint(cmd);
+        break;
+      case MOVE:
+        executeMove(cmd);
+        break;
+      case CHARGE:
+        executeCharge(cmd);
+        break;
+      case CANCEL:
+      case PAUSE:
+      case CONTINUE:
+        executeCancelPauseContinue(cmd);
+        break;
+      default:
+        LOG.warn("{}: Received unknown type command: {}", getVehicleName(), cmd);
+    }
+  }
+
+  private void executePickPlaceJoint(Command cmd) {
+    // 参数校验
+    List<Command.CommandParams.TargetID> targetIds
+        = requireNonNull(cmd.getParams().getTargetID(), "targetIds");
+    checkArgument(targetIds.size() == 1, "pick/place/joint targetIds size must be 1");
+
+    // 创建指令记录，并执行指令
+    List<DestinationCreationTO> destinations = List.of(
+        new DestinationCreationTO(NameConvertor.toStackName(targetIds.get(0).getLocation()), cmd.getType())
+    );
+    TransportOrderCreationTO orderTO
+        = new TransportOrderCreationTO(NameConvertor.toCommandName(cmd.getParams().getUniqueID()), destinations)
+        .withIntendedVehicleName(getVehicleName())
+        .withType(cmd.getType());
+    orderService.createTransportOrder(orderTO);
+    dispatcherService.dispatch();
+  }
+
+  private void executeMove(Command cmd) {
+    // 参数校验
+    List<Command.CommandParams.TargetID> targetIds
+        = requireNonNull(cmd.getParams().getTargetID(), "targetIds");
+    checkArgument(targetIds.size() == 2, "move targetIds size should be 2");
+
+    // 创建指令记录，并执行指令
+    List<DestinationCreationTO> destinations = new ArrayList<>(targetIds.size());
+    targetIds.forEach(targetID -> {
+      destinations.add(
+          new DestinationCreationTO(
+              NameConvertor.toPointName(targetID.getLocation()),
+              cmd.getType()
+          )
+      );
+    });
+    TransportOrderCreationTO orderTO
+        = new TransportOrderCreationTO(NameConvertor.toCommandName(cmd.getParams().getUniqueID()), destinations)
+        .withIntendedVehicleName(getVehicleName())
+        .withType(cmd.getType());
+    orderService.createTransportOrder(orderTO);
+    dispatcherService.dispatch();
+  }
+
+  private void executeCharge(Command cmd) {
+    // 参数校验
+    List<Command.CommandParams.TargetID> targetIds
+        = requireNonNull(cmd.getParams().getTargetID(), "targetIds");
+    checkArgument(targetIds.size() == 2, "charge targetIds size should be 2");
+
+    // 创建指令记录，并执行指令
+    List<DestinationCreationTO> destinations = new ArrayList<>(1);
+    String destName = NameConvertor.toRechargeName(targetIds.get(1).getLocation());
+    String type = cmd.getParams().getCommand() == 1 ?
+        Command.Type.CHARGE.getType() : Command.Type.STOP_CHARGE.getType();
+    destinations.add(new DestinationCreationTO(destName, type));  // 终点
+    TransportOrderCreationTO orderTO
+        = new TransportOrderCreationTO(NameConvertor.toCommandName(cmd.getParams().getUniqueID()), destinations)
+        .withIntendedVehicleName(getVehicleName())
+        .withType(type);
+    orderService.createTransportOrder(orderTO);
+    dispatcherService.dispatch();
+  }
+
+  private void executeCancelPauseContinue(Command cmd) {
+    // 创建指令记录，并执行指令
+    List<DestinationCreationTO> destinations
+        = List.of(new DestinationCreationTO(
+        vehicleModel.getVehiclePosition() != null ? vehicleModel.getVehiclePosition() : "",
+        OP_NOP));
+    TransportOrderCreationTO orderTO
+        = new TransportOrderCreationTO(NameConvertor.toCommandName(cmd.getParams().getUniqueID()), destinations)
+        .withIntendedVehicleName(getVehicleName())
+        .withType(cmd.getType());
+    orderService.createFinishedTransportOrder(orderTO);
+    Command.Type type = Command.Type.fromString(requireNonNull(cmd.getType(), "cmdType"));
+    switch (type) {
+      case CANCEL:
+        dispatcherService.withdrawByVehicle(vehicleModel.getVehicleReference(), false);
+        break;
+      case PAUSE:
+        vehicleService.updateVehiclePaused(vehicleModel.getVehicleReference(), true);
+        break;
+      case CONTINUE:
+        vehicleService.updateVehiclePaused(vehicleModel.getVehicleReference(), false);
+        break;
+    }
+    // 发送指令执行结果
+    sendResult(
+        cmd.getParams().getUniqueID(),
+        type,
+        Result.ErrorCode.SUCCEED.ordinal(),
+        Result.ErrorReason.NONE.getValue(),
+        null,
+        false);
+  }
+
+  private void handleManagementCommand(Command cmd) {
+    // 执行指令（不创建指令记录）, 并发送执行结果
+    Command.Type type = Command.Type.fromString(requireNonNull(cmd.getType(), "cmdType"));
+    switch (type) {
+      case ONLINE:
+        vehicleService.updateVehicleIntegrationLevel(
+            vehicleModel.getVehicleReference(), Vehicle.IntegrationLevel.TO_BE_UTILIZED);
+        sendResult(
+            null,
+            type,
+            Result.ErrorCode.SUCCEED.ordinal(),
+            Result.ErrorReason.NONE.getValue(),
+            null,
+            false);
+        break;
+      case OFFLINE:
+        vehicleService.updateVehicleIntegrationLevel(
+            vehicleModel.getVehicleReference(), Vehicle.IntegrationLevel.TO_BE_RESPECTED);
+        sendResult(
+            null,
+            type,
+            Result.ErrorCode.SUCCEED.ordinal(),
+            Result.ErrorReason.NONE.getValue(),
+            null,
+            false);
+        break;
+      case SHUTDOWN:
+        sendResult(
+            null,
+            type,
+            Result.ErrorCode.SUCCEED.ordinal(),
+            Result.ErrorReason.NONE.getValue(),
+            null,
+            true);
+        vehicleService.disableCommAdapter(vehicleModel.getVehicleReference());
+        break;
+      default:
+        LOG.warn("{}: Received unknown type command: {}", getVehicleName(), cmd);
+    }
+  }
+
+  public boolean sendHeartbeat() {
+    return send(MessageGenerator.generateHeartbeat(vehicleModel), false);
+  }
+
+  public boolean sendAck(@NonNull Response ack) {
+    return send(ack, false);
+  }
+
+  public boolean sendResult(UnsignedLong uniqueId,
+                            Command.Type type,
+                            int errorCode,
+                            int errorReason,
+                            String actualBarcode,
+                            boolean await) {
+    Result result = MessageGenerator.generateResult(
+        NameConvertor.toRobotId(getVehicleName()),
+        uniqueId,
+        type,
+        errorCode,
+        errorReason,
+        actualBarcode,
+        isNotInstantCommand(type.getType())
+    );
+    return send(result, await);
+  }
+
+  private boolean send(@NonNull Message msg, boolean await) {
+    // 是否需要应答
+    boolean needAck = msg.getHeader().getMsgMode() == Message.Header.Mode.ACK.getValue();
+    // 将消息放入消息列表
     final int timeoutMillis = (needAck ?
         SocketConstants.SEND_TIMEOUT + SocketConstants.ACK_TIMEOUT : SocketConstants.SEND_TIMEOUT) * 1000;
     final MessageWrapper msgWrapper = new MessageWrapper(msg, timeoutMillis);
-
+    if (msg.getChannel() != Message.Channel.DATA.ordinal() && msg.getParams().getUniqueID() != null)
+      resendTable.put(msg.getParams().getUniqueID(), msgWrapper);
+    // 打包消息并发送
+    final ChannelFuture channelFuture = channel.writeAndFlush(msg);
+    // 检查发送情况
     channelFuture.addListener((ChannelFutureListener) future -> {
       msgWrapper.setSendSuccess(true);
       msgWrapper.releaseSend();
-      if (msg.getChannel() != 2) {
-        resendTable.put(msg.getParams().getUniqueID(), msgWrapper);
-      }
     });
     if (await) {
       // 等待发送
@@ -255,12 +489,9 @@ public class SocketClient {
         msgWrapper.awaitSend(SocketConstants.SEND_TIMEOUT, TimeUnit.SECONDS);
       } catch (InterruptedException e) {
         LOG.error(
-            String.format(
-                "%s: awaitSend[type=%s, uniqueID=%s] exception: ",
-                vehicleModel.getName(),
-                msg.getType(),
-                msg.getParams().getUniqueID().toString()
-            ), e);
+            "{}: AwaitSend[type={}, uniqueID={}] exception: ",
+            getVehicleName(), msg.getType(), msg.getParams().getUniqueID().toString(), e
+        );
         return false;
       }
       // 等待应答
@@ -271,12 +502,9 @@ public class SocketClient {
         } catch (InterruptedException e) {
           UnsignedLong uniqueID = msg.getParams().getUniqueID();
           LOG.error(
-              String.format(
-                  "%s: awaitAck[type=%s, uniqueID=%s] exception: ",
-                  vehicleModel.getName(),
-                  msg.getType(),
-                  uniqueID.toString()
-              ), e);
+              "{}: AwaitAck[type={}, uniqueID={}] exception: ",
+              getVehicleName(), msg.getType(), uniqueID.toString(), e
+          );
           return false;
         }
       }
@@ -294,11 +522,11 @@ public class SocketClient {
     return 2;
   }
 
-  public static boolean isImmediateCommand(Message msg) {
-    return msg.getChannel() == 1
-        && Arrays.stream(SocketConstants.IMMEDIATE_COMMAND).noneMatch(type -> type.equals(msg.getType()));
+  public static boolean isNotInstantCommand(String commandType) {
+    return Arrays.stream(SocketConstants.INSTANT_COMMAND).noneMatch(type -> type.getType().equals(commandType));
   }
 
+  @Data
   static class MessageWrapper {
     private final long beginTimestamp = System.currentTimeMillis();
     private final Message msg;
@@ -334,34 +562,6 @@ public class SocketClient {
     public void releaseAll() {
       sendCountDownLatch.countDown();
       ackCountDownLatch.countDown();
-    }
-
-    public long getBeginTimestamp() {
-      return beginTimestamp;
-    }
-
-    public long getTimeoutMillis() {
-      return timeoutMillis;
-    }
-
-    public boolean isSendSuccess() {
-      return sendSuccess;
-    }
-
-    public void setSendSuccess(boolean sendSuccess) {
-      this.sendSuccess = sendSuccess;
-    }
-
-    public boolean isAckSuccess() {
-      return ackSuccess;
-    }
-
-    public void setAckSuccess(boolean ackSuccess) {
-      this.ackSuccess = ackSuccess;
-    }
-
-    public Message getMsg() {
-      return msg;
     }
   }
 }
