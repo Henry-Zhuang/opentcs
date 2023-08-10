@@ -51,7 +51,7 @@ class SocketClientInitializer extends ChannelInitializer<SocketChannel> {
     protected void encode(ChannelHandlerContext ctx, Message msg, ByteBuf out) throws Exception {
       // 报文数据区内容转为json格式
       String dataJson = DataToJson(msg);
-//            byte[] jsonData = objectMapper.writeValueAsBytes(msg);
+//    byte[] jsonData = objectMapper.writeValueAsBytes(msg);
 
       // 写入报文头部信息
       out.writeBytes(new byte[]{(byte) 0xAA, 0x55, (byte) 0xAA, 0X55, 0x01, 0x2F});
@@ -111,18 +111,26 @@ class SocketClientInitializer extends ChannelInitializer<SocketChannel> {
     @Override
     protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Exception {
       // 报文序号字段
-      String msgSeq = in.readBytes(32).toString(CharsetUtil.UTF_8);
+      ByteBuf seqBuf = in.readBytes(32);  // 注意：readBytes会新生成一个ByteBuf，使用后需释放掉，否则会造成内存泄露
+      String msgSeq = seqBuf.toString(CharsetUtil.UTF_8);
+      seqBuf.release();
       // 报文类型
       byte msgMode = in.readByte();
       // 报文数据区长度
       int msgLen = in.readIntLE();
       // CRC校验字段
-      byte[] crc = ByteBufUtil.getBytes(in.readBytes(2));
+      ByteBuf crcBuf = in.readBytes(2);
+      byte[] crc = ByteBufUtil.getBytes(crcBuf);
+      crcBuf.release();
       // 保留字段
-      byte[] reserved = ByteBufUtil.getBytes(in.readBytes(2));
+      ByteBuf reservedBuf = in.readBytes(2);
+      byte[] reserved = ByteBufUtil.getBytes(reservedBuf);
+      reservedBuf.release();
       Message.Header header = new Message.Header(msgSeq, msgMode, msgLen, crc, reserved);
       // 报文数据区内容
-      String dataStr = in.readBytes(in.readableBytes()).toString(CharsetUtil.UTF_8);
+      ByteBuf dataBuf = in.readBytes(in.readableBytes());
+      String dataStr = dataBuf.toString(CharsetUtil.UTF_8);
+      dataBuf.release();
       Message msg = JsonToData(dataStr, msgMode);
       msg.setHeader(header);
       out.add(msg);
