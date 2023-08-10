@@ -158,11 +158,11 @@ public class DriveOrder
     /**
      * An operation constant for parking the vehicle.
      */
-    public static final String OP_PARK = "PARK";
+    public static final String OP_PARK = "park";
     /**
      * An operation constant for sending the vehicle to a point without a location associated to it.
      */
-    public static final String OP_MOVE = "MOVE";
+    public static final String OP_MOVE = "move";
     /**
      * The actual destination (point or location).
      */
