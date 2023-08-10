@@ -10,6 +10,7 @@ package org.opentcs.modeleditor;
 import java.util.HashSet;
 import java.util.Set;
 import org.opentcs.common.LoopbackAdapterConstants;
+import org.opentcs.common.rms.SocketConstants;
 import org.opentcs.components.kernel.Dispatcher;
 import org.opentcs.components.kernel.Router;
 import org.opentcs.components.kernel.Scheduler;
@@ -37,10 +38,13 @@ public class DefaultPropertySuggestions
     keySuggestions.add(Dispatcher.PROPKEY_PREFERRED_RECHARGE_LOCATION);
     keySuggestions.add(LoopbackAdapterConstants.PROPKEY_INITIAL_POSITION);
     keySuggestions.add(LoopbackAdapterConstants.PROPKEY_OPERATING_TIME);
+    keySuggestions.add(LoopbackAdapterConstants.PROPKEY_FULL_RECHARGING_TIME);
     keySuggestions.add(LoopbackAdapterConstants.PROPKEY_LOAD_OPERATION);
     keySuggestions.add(LoopbackAdapterConstants.PROPKEY_UNLOAD_OPERATION);
     keySuggestions.add(LoopbackAdapterConstants.PROPKEY_ACCELERATION);
     keySuggestions.add(LoopbackAdapterConstants.PROPKEY_DECELERATION);
+    keySuggestions.add(SocketConstants.PROPERTY_KEY_SERVER_PORT);
+    keySuggestions.add(SocketConstants.PROPERTY_KEY_SERVER_IP);
   }
 
   @Override
