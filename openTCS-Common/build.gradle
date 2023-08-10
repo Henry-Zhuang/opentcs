@@ -8,6 +8,10 @@ dependencies {
 
   implementation group: 'jakarta.xml.bind', name: 'jakarta.xml.bind-api', version: '4.0.0'
   implementation group: 'org.glassfish.jaxb', name: 'jaxb-runtime', version: '4.0.2'
+  implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.1'
+  implementation 'com.google.guava:guava:31.1-jre'
+  compileOnly 'org.projectlombok:lombok:1.18.26'
+  annotationProcessor 'org.projectlombok:lombok:1.18.26'
 }
 
 processResources.doLast {
