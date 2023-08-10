@@ -312,9 +312,10 @@ public class SocketClient implements EventHandler, Lifecycle {
     checkArgument(targetIds.size() == 1, "pick/place/joint targetIds size must be 1");
 
     // 创建指令记录，并执行指令
-    List<DestinationCreationTO> destinations = List.of(
-        new DestinationCreationTO(NameConvertor.toStackName(targetIds.get(0).getLocation()), cmd.getType())
-    );
+    String destName = cmd.getType().equals(Command.Type.JOINT.getType()) ?
+        NameConvertor.toStationName(targetIds.get(0).getLocation())
+        : NameConvertor.toStackName(targetIds.get(0).getLocation(), cmd.getParams().getToteDirection());
+    List<DestinationCreationTO> destinations = List.of(new DestinationCreationTO(destName, cmd.getType()));
     TransportOrderCreationTO orderTO
         = new TransportOrderCreationTO(NameConvertor.toCommandName(cmd.getParams().getUniqueID()), destinations)
         .withIntendedVehicleName(getVehicleName())
@@ -331,14 +332,12 @@ public class SocketClient implements EventHandler, Lifecycle {
 
     // 创建指令记录，并执行指令
     List<DestinationCreationTO> destinations = new ArrayList<>(targetIds.size());
-    targetIds.forEach(targetID -> {
-      destinations.add(
-          new DestinationCreationTO(
-              NameConvertor.toPointName(targetID.getLocation()),
-              cmd.getType()
-          )
-      );
-    });
+    targetIds.forEach(targetID -> destinations.add(
+        new DestinationCreationTO(
+            NameConvertor.toPointName(targetID.getLocation()),
+            cmd.getType()
+        )
+    ));
     TransportOrderCreationTO orderTO
         = new TransportOrderCreationTO(NameConvertor.toCommandName(cmd.getParams().getUniqueID()), destinations)
         .withIntendedVehicleName(getVehicleName())
