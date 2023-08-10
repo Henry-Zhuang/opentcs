@@ -218,9 +218,7 @@ public class TransportOrdersContainerPanel
   }
 
   private void createCopyOfSelectedTransportOrder() {
-    getSelectedTransportOrder().ifPresent(
-        transportOrder -> orderUtil.createTransportOrder(transportOrder)
-    );
+    getSelectedTransportOrder().ifPresent(orderUtil::createTransportOrder);
   }
 
   private void showPopupMenuForSelectedTransportOrder(int x, int y) {
