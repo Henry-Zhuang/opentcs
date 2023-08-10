@@ -40,6 +40,12 @@ public interface VirtualVehicleConfiguration {
   String rechargeOperation();
 
   @ConfigurationEntry(
+      type = "String",
+      description = "The string to be treated as a stop recharge operation.",
+      orderKey = "1_attributes_3")
+  String stopRechargeOperation();
+
+  @ConfigurationEntry(
       type = "Double",
       description = {"The simulation time factor.",
                      "1.0 is real time, greater values speed up simulation."},
@@ -57,4 +63,22 @@ public interface VirtualVehicleConfiguration {
       description = {"The virtual vehicle's length in mm when it's unloaded."},
       orderKey = "2_behaviour_3")
   int vehicleLengthUnloaded();
+
+  @ConfigurationEntry(
+      type = "Double",
+      description = {"The default time needed for vehicle recharging from empty energy to full energy."},
+      orderKey = "2_behaviour_4")
+  double defaultRechargingTime();
+
+  @ConfigurationEntry(
+      type = "String",
+      description = {"The socket server ip address that the virtual vehicle will connect to."},
+      orderKey = "3_socket_1")
+  String socketServerIp();
+
+  @ConfigurationEntry(
+      type = "String",
+      description = {"The socket server port that the virtual vehicle will connect to."},
+      orderKey = "3_socket_2")
+  String socketServerPort();
 }
