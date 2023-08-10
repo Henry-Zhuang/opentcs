@@ -9,11 +9,10 @@ dependencies {
   api project(':openTCS-Common')
 
   implementation 'io.netty:netty-all:4.1.90.Final'
-  implementation group: 'jakarta.xml.bind', name: 'jakarta.xml.bind-api', version: '4.0.0'
   implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.1'
+  runtimeOnly group: 'org.slf4j', name: 'slf4j-jdk14', version: '2.0.5'
   compileOnly 'org.projectlombok:lombok:1.18.26'
   annotationProcessor 'org.projectlombok:lombok:1.18.26'
-  runtimeOnly group: 'org.slf4j', name: 'slf4j-jdk14', version: '2.0.5'
 }
 
 task release {
