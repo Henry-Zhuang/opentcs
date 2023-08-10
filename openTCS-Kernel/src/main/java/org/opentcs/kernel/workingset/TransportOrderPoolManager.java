@@ -142,6 +142,32 @@ public class TransportOrderPoolManager
     return newOrder;
   }
 
+  public TransportOrder createFinishedTransportOrder(TransportOrderCreationTO to)
+      throws ObjectUnknownException, ObjectExistsException, IllegalArgumentException {
+    TransportOrder newOrder = new TransportOrder(nameFor(to),
+        toDriveOrders(to.getDestinations()))
+        .withCreationTime(Instant.now())
+        .withPeripheralReservationToken(to.getPeripheralReservationToken())
+        .withIntendedVehicle(toVehicleReference(to.getIntendedVehicleName()))
+        .withType(to.getType())
+        .withDeadline(to.getDeadline())
+        .withDispensable(to.isDispensable())
+        .withWrappingSequence(getWrappingSequence(to))
+        .withDependencies(getDependencies(to))
+        .withProperties(to.getProperties())
+        .withState(TransportOrder.State.FINISHED);
+
+    LOG.info("Transport order is being created: {} -- {}",
+        newOrder.getName(),
+        newOrder.getAllDriveOrders());
+
+    getObjectRepo().addObject(newOrder);
+    emitObjectEvent(newOrder, null, TCSObjectEvent.Type.OBJECT_CREATED);
+
+    // Return the newly created transport order.
+    return newOrder;
+  }
+
   /**
    * Sets a transport order's state.
    *

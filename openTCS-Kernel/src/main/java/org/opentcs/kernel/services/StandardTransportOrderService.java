@@ -164,6 +164,14 @@ public class StandardTransportOrderService
   }
 
   @Override
+  public TransportOrder createFinishedTransportOrder(TransportOrderCreationTO to)
+      throws ObjectUnknownException, ObjectExistsException {
+    synchronized (globalSyncObject) {
+      return orderPoolManager.createFinishedTransportOrder(to);
+    }
+  }
+
+  @Override
   public void markOrderSequenceComplete(TCSObjectReference<OrderSequence> ref)
       throws ObjectUnknownException {
     synchronized (globalSyncObject) {
