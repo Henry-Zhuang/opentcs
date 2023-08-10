@@ -188,8 +188,8 @@ public class KernelStateOperating
     for (Vehicle curVehicle : vehicleService.fetchObjects(Vehicle.class)) {
       vehicleService.updateVehicleProcState(curVehicle.getReference(), Vehicle.ProcState.IDLE);
       vehicleService.updateVehicleIntegrationLevel(curVehicle.getReference(),
-                                                   Vehicle.IntegrationLevel.TO_BE_RESPECTED);
-      vehicleService.updateVehicleState(curVehicle.getReference(), Vehicle.State.UNKNOWN);
+                                                   Vehicle.IntegrationLevel.TO_BE_UTILIZED);
+      vehicleService.updateVehicleState(curVehicle.getReference(), Vehicle.State.IDLE);
       vehicleService.updateVehicleTransportOrder(curVehicle.getReference(), null);
       vehicleService.updateVehicleOrderSequence(curVehicle.getReference(), null);
     }
