@@ -60,6 +60,10 @@ public abstract class BasicVehicleCommAdapter
    */
   private final String rechargeOperation;
   /**
+   * The string to recognize as a stop recharge operation.
+   */
+  private final String stopRechargeOperation;
+  /**
    * The executor to run tasks on.
    */
   private final Executor executor;
@@ -102,6 +106,7 @@ public abstract class BasicVehicleCommAdapter
                                  int commandQueueCapacity,
                                  int sentQueueCapacity,
                                  String rechargeOperation,
+                                 String stopRechargeOperation,
                                  Executor executor) {
     this.vehicleModel = requireNonNull(vehicleModel, "vehicleModel");
     this.commandQueueCapacity = checkInRange(commandQueueCapacity,
@@ -113,6 +118,7 @@ public abstract class BasicVehicleCommAdapter
                                           Integer.MAX_VALUE,
                                           "sentQueueCapacity");
     this.rechargeOperation = requireNonNull(rechargeOperation, "rechargeOperation");
+    this.stopRechargeOperation = requireNonNull(stopRechargeOperation, "stopRechargeOperation");
     this.executor = requireNonNull(executor, "executor");
   }
 
@@ -130,11 +136,13 @@ public abstract class BasicVehicleCommAdapter
                                  int commandQueueCapacity,
                                  int sentQueueCapacity,
                                  String rechargeOperation,
+                                 String stopRechargeOperation,
                                  ScheduledExecutorService executor) {
     this(vehicleModel,
          commandQueueCapacity,
          sentQueueCapacity,
          rechargeOperation,
+        stopRechargeOperation,
          (Executor) executor);
   }
 
@@ -267,6 +275,10 @@ public abstract class BasicVehicleCommAdapter
   @Override
   public String getRechargeOperation() {
     return rechargeOperation;
+  }
+
+  public String getStopRechargeOperation() {
+    return stopRechargeOperation;
   }
 
   @Override
