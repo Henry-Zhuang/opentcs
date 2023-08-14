@@ -59,13 +59,17 @@ public class LoopbackVehicleModel
   private final VelocityHistory velocityHistory = new VelocityHistory(100, 10);
 
   public LoopbackVehicleModel(Vehicle attachedVehicle,
+                              int defaultAcceleration,
+                              int defaultDeceleration,
+                              int defaultOperatingTime,
                               double defaultRechargeTime) {
     super(attachedVehicle);
-    this.velocityController = new VelocityController(parseDeceleration(attachedVehicle),
-        parseAcceleration(attachedVehicle),
+    this.velocityController = new VelocityController(
+        parseDeceleration(attachedVehicle, defaultDeceleration),
+        parseAcceleration(attachedVehicle, defaultAcceleration),
         attachedVehicle.getMaxReverseVelocity(),
         attachedVehicle.getMaxVelocity());
-    this.operatingTime = parseOperatingTime(attachedVehicle);
+    this.operatingTime = parseOperatingTime(attachedVehicle, defaultOperatingTime);
     this.fullRechargingTime = parseRechargingTime(attachedVehicle, defaultRechargeTime);
     this.fullRunningTime = 4 * this.fullRechargingTime;
     this.loadOperation = extractLoadOperation(attachedVehicle);
@@ -327,10 +331,10 @@ public class LoopbackVehicleModel
         velocityHistory);
   }
 
-  private int parseOperatingTime(Vehicle vehicle) {
+  private int parseOperatingTime(Vehicle vehicle, int defaultOperatingTime) {
     String opTime = vehicle.getProperty(LoopbackAdapterConstants.PROPKEY_OPERATING_TIME);
     // Ensure it's a positive value.
-    return Math.max(Parsers.tryParseString(opTime, 5000), 1);
+    return Math.max(Parsers.tryParseString(opTime, defaultOperatingTime), 1);
   }
 
   private double parseRechargingTime(Vehicle vehicle, double defaultTime) {
@@ -352,10 +356,10 @@ public class LoopbackVehicleModel
    * @param vehicle the vehicle
    * @return the maximum acceleration.
    */
-  private int parseAcceleration(Vehicle vehicle) {
+  private int parseAcceleration(Vehicle vehicle, int defaultAcceleration) {
     String acceleration = vehicle.getProperty(LoopbackAdapterConstants.PROPKEY_ACCELERATION);
     // Ensure it's a positive value.
-    return Math.max(Parsers.tryParseString(acceleration, 500), 1);
+    return Math.max(Parsers.tryParseString(acceleration, defaultAcceleration), 1);
   }
 
   /**
@@ -364,10 +368,10 @@ public class LoopbackVehicleModel
    * @param vehicle the vehicle
    * @return the maximum deceleration.
    */
-  private int parseDeceleration(Vehicle vehicle) {
+  private int parseDeceleration(Vehicle vehicle, int defaultDeceleration) {
     String deceleration = vehicle.getProperty(LoopbackAdapterConstants.PROPKEY_DECELERATION);
     // Ensure it's a negative value.
-    return Math.min(Parsers.tryParseString(deceleration, -500), -1);
+    return Math.min(Parsers.tryParseString(deceleration, defaultDeceleration), -1);
   }
 
   private static String extractLoadOperation(Vehicle attachedVehicle) {

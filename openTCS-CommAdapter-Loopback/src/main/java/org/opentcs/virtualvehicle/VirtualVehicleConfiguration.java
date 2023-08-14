@@ -34,16 +34,16 @@ public interface VirtualVehicleConfiguration {
   int commandQueueCapacity();
 
   @ConfigurationEntry(
-      type = "String",
-      description = "The string to be treated as a recharge operation.",
-      orderKey = "1_attributes_2")
-  String rechargeOperation();
+      type = "Integer",
+      description = "The virtual vehicle's default maximum acceleration (in mm/s).",
+      orderKey = "1_attributes_4")
+  int defaultAcceleration();
 
   @ConfigurationEntry(
-      type = "String",
-      description = "The string to be treated as a stop recharge operation.",
-      orderKey = "1_attributes_3")
-  String stopRechargeOperation();
+      type = "Integer",
+      description = "The virtual vehicle's default maximum deceleration (in mm/s).",
+      orderKey = "1_attributes_5")
+  int defaultDeceleration();
 
   @ConfigurationEntry(
       type = "Double",
@@ -69,6 +69,12 @@ public interface VirtualVehicleConfiguration {
       description = {"The default time needed for vehicle recharging from empty energy to full energy."},
       orderKey = "2_behaviour_4")
   double defaultRechargingTime();
+
+  @ConfigurationEntry(
+      type = "Double",
+      description = {"The default time needed for vehicle loading or unloading."},
+      orderKey = "2_behaviour_5")
+  int defaultOperatingTime();
 
   @ConfigurationEntry(
       type = "String",

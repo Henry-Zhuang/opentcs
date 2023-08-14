@@ -7,6 +7,8 @@
  */
 package org.opentcs.common;
 
+import org.opentcs.common.rms.message.Command;
+
 /**
  * This interface provides access to vehicle-property keys that are used in both the
  * plant overview and in the kernel.
@@ -32,7 +34,7 @@ public interface LoopbackAdapterConstants {
   /**
    * The default value of the load operation property.
    */
-  String PROPVAL_LOAD_OPERATION_DEFAULT = "pick";
+  String PROPVAL_LOAD_OPERATION_DEFAULT = Command.Type.PICK.getType();
   /**
    * The key of the vehicle property that specifies which operation unloads the load handling
    * device.
@@ -41,7 +43,11 @@ public interface LoopbackAdapterConstants {
   /**
    * The default value of the unload operation property.
    */
-  String PROPVAL_UNLOAD_OPERATION_DEFAULT = "place";
+  String PROPVAL_UNLOAD_OPERATION_DEFAULT = Command.Type.PLACE.getType();
+  String PROPVAL_JOINT_OPERATION_DEFAULT = Command.Type.JOINT.getType();
+  String PROPVAL_RECHARGE_OPERATION_DEFAULT = Command.Type.CHARGE.getType();
+  String PROPVAL_STOP_RECHARGE_OPERATION_DEFAULT = Command.Type.STOP_CHARGE.getType();
+
   /**
    * The key of the vehicle property that specifies the maximum acceleration of a vehicle.
    */
