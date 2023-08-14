@@ -21,7 +21,7 @@ public class SocketClientTest {
   @Test
   public void startup() {
     LoopbackVehicleModel vehicleModel = new LoopbackVehicleModel(
-        new Vehicle("Vehicle-001"), 3600000
+        new Vehicle("Vehicle-001"), 1000, -500, 50000,3600000
     );
     SocketClient
         client = new SocketClient(
