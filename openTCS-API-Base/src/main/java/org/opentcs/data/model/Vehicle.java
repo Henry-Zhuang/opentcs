@@ -161,7 +161,7 @@ public class Vehicle
     this.energyLevelSufficientlyRecharged = 30;
     this.maxVelocity = 1000;
     this.maxReverseVelocity = 1000;
-    this.rechargeOperation = "CHARGE";
+    this.rechargeOperation = "charge";
     this.procState = ProcState.IDLE;
     this.transportOrder = null;
     this.orderSequence = null;
