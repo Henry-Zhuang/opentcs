@@ -1,6 +1,6 @@
 /**
  * Copyright (c) The openTCS Authors.
- *
+ * <p>
  * This program is free software and subject to the MIT license. (For details,
  * see the licensing information (LICENSE.txt) you should have received with
  * this copy of the software.)
@@ -8,18 +8,14 @@
 package org.opentcs.kernel.workingset;
 
 import java.awt.Color;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+
 import static java.util.Objects.requireNonNull;
-import java.util.Set;
+
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import javax.inject.Inject;
+
 import org.opentcs.access.to.model.BlockCreationTO;
 import org.opentcs.access.to.model.LocationCreationTO;
 import org.opentcs.access.to.model.LocationTypeCreationTO;
@@ -29,6 +25,7 @@ import org.opentcs.access.to.model.PointCreationTO;
 import org.opentcs.access.to.model.VehicleCreationTO;
 import org.opentcs.access.to.model.VisualLayoutCreationTO;
 import org.opentcs.access.to.peripherals.PeripheralOperationCreationTO;
+import org.opentcs.common.rms.NameConvertor;
 import org.opentcs.customizations.ApplicationEventBus;
 import org.opentcs.data.ObjectExistsException;
 import org.opentcs.data.ObjectUnknownException;
@@ -46,14 +43,16 @@ import org.opentcs.data.model.TCSResource;
 import org.opentcs.data.model.TCSResourceReference;
 import org.opentcs.data.model.Triple;
 import org.opentcs.data.model.Vehicle;
-import org.opentcs.data.model.visualization.ElementPropKeys;
-import org.opentcs.data.model.visualization.VisualLayout;
+import org.opentcs.data.model.visualization.*;
 import org.opentcs.data.order.OrderSequence;
 import org.opentcs.data.order.TransportOrder;
 import org.opentcs.data.peripherals.PeripheralJob;
 import org.opentcs.data.peripherals.PeripheralOperation;
 import org.opentcs.drivers.vehicle.LoadHandlingDevice;
+
+import static org.opentcs.common.LoopbackAdapterConstants.*;
 import static org.opentcs.util.Assertions.checkState;
+
 import org.opentcs.util.Colors;
 import org.opentcs.util.annotations.ScheduledApiChange;
 import org.opentcs.util.event.EventHandler;
@@ -75,6 +74,12 @@ public class PlantModelManager
    * This class's Logger.
    */
   private static final Logger LOG = LoggerFactory.getLogger(PlantModelManager.class);
+  private static final long X_INTERVAL = 500;
+  private static final long Y_INTERVAL = 600;
+  private static final long LABEL_X_OFFSET = -10;
+  private static final long LABEL_Y_OFFSET = -20;
+  private static final int MAX_VELOCITY = 1500;
+  private static final int MAX_REVERSE_VELOCITY = 1500;
   /**
    * This model's name.
    */
@@ -87,7 +92,7 @@ public class PlantModelManager
   /**
    * Creates a new model.
    *
-   * @param objectRepo The object repo.
+   * @param objectRepo   The object repo.
    * @param eventHandler The event handler to publish events to.
    */
   @Inject
@@ -150,8 +155,8 @@ public class PlantModelManager
     for (TCSObject<?> curObject : objects) {
       getObjectRepo().removeObject(curObject.getReference());
       emitObjectEvent(null,
-                      curObject,
-                      TCSObjectEvent.Type.OBJECT_REMOVED);
+          curObject,
+          TCSObjectEvent.Type.OBJECT_REMOVED);
     }
   }
 
@@ -160,7 +165,7 @@ public class PlantModelManager
    * transfer object.
    *
    * @param to The transfer object from which to create the new objects.
-   * @throws ObjectExistsException If an object with a new object's name already exists.
+   * @throws ObjectExistsException  If an object with a new object's name already exists.
    * @throws ObjectUnknownException If any object referenced in the TO does not exist.
    */
   @SuppressWarnings("deprecation")
@@ -202,9 +207,9 @@ public class PlantModelManager
   /**
    * Locks/Unlocks a path.
    *
-   * @param ref A reference to the path to be modified.
+   * @param ref       A reference to the path to be modified.
    * @param newLocked If <code>true</code>, this path will be locked when the
-   * method call returns; if <code>false</code>, this path will be unlocked.
+   *                  method call returns; if <code>false</code>, this path will be unlocked.
    * @return The modified path.
    * @throws ObjectUnknownException If the referenced path does not exist.
    */
@@ -214,17 +219,17 @@ public class PlantModelManager
     Path path = previousState.withLocked(newLocked);
     getObjectRepo().replaceObject(path.withLocked(newLocked));
     emitObjectEvent(path,
-                    previousState,
-                    TCSObjectEvent.Type.OBJECT_MODIFIED);
+        previousState,
+        TCSObjectEvent.Type.OBJECT_MODIFIED);
     return path;
   }
 
   /**
    * Locks/Unlocks a location.
    *
-   * @param ref A reference to the location to be modified.
+   * @param ref       A reference to the location to be modified.
    * @param newLocked If {@code true}, this path will be locked when the method call returns;
-   * if {@code false}, this path will be unlocked.
+   *                  if {@code false}, this path will be unlocked.
    * @return The modified location.
    * @throws ObjectUnknownException If the referenced location does not exist.
    */
@@ -234,15 +239,15 @@ public class PlantModelManager
     Location location = previousState.withLocked(newLocked);
     getObjectRepo().replaceObject(location);
     emitObjectEvent(location,
-                    previousState,
-                    TCSObjectEvent.Type.OBJECT_MODIFIED);
+        previousState,
+        TCSObjectEvent.Type.OBJECT_MODIFIED);
     return location;
   }
 
   /**
    * Sets a location's reservation token.
    *
-   * @param ref A reference to the location to be modified.
+   * @param ref      A reference to the location to be modified.
    * @param newToken The new reservation token.
    * @return The modified location.
    * @throws ObjectUnknownException If the referenced location does not exist.
@@ -255,15 +260,15 @@ public class PlantModelManager
     );
     getObjectRepo().replaceObject(location);
     emitObjectEvent(location,
-                    previousState,
-                    TCSObjectEvent.Type.OBJECT_MODIFIED);
+        previousState,
+        TCSObjectEvent.Type.OBJECT_MODIFIED);
     return location;
   }
 
   /**
    * Sets a location's processing state.
    *
-   * @param ref A reference to the location to be modified.
+   * @param ref      A reference to the location to be modified.
    * @param newState The new processing state.
    * @return The modified location.
    * @throws ObjectUnknownException If the referenced location does not exist.
@@ -277,15 +282,15 @@ public class PlantModelManager
     );
     getObjectRepo().replaceObject(location);
     emitObjectEvent(location,
-                    previousState,
-                    TCSObjectEvent.Type.OBJECT_MODIFIED);
+        previousState,
+        TCSObjectEvent.Type.OBJECT_MODIFIED);
     return location;
   }
 
   /**
    * Sets a location's state.
    *
-   * @param ref A reference to the location to be modified.
+   * @param ref      A reference to the location to be modified.
    * @param newState The new state.
    * @return The modified location.
    * @throws ObjectUnknownException If the referenced location does not exist.
@@ -299,15 +304,15 @@ public class PlantModelManager
     );
     getObjectRepo().replaceObject(location);
     emitObjectEvent(location,
-                    previousState,
-                    TCSObjectEvent.Type.OBJECT_MODIFIED);
+        previousState,
+        TCSObjectEvent.Type.OBJECT_MODIFIED);
     return location;
   }
 
   /**
    * Sets a location's peripheral job.
    *
-   * @param ref A reference to the location to be modified.
+   * @param ref    A reference to the location to be modified.
    * @param newJob The new peripheral job.
    * @return The modified location.
    * @throws ObjectUnknownException If the referenced location does not exist.
@@ -321,35 +326,35 @@ public class PlantModelManager
     );
     getObjectRepo().replaceObject(location);
     emitObjectEvent(location,
-                    previousState,
-                    TCSObjectEvent.Type.OBJECT_MODIFIED);
+        previousState,
+        TCSObjectEvent.Type.OBJECT_MODIFIED);
     return location;
   }
 
   /**
    * Sets a vehicle's energy level.
    *
-   * @param ref A reference to the vehicle to be modified.
+   * @param ref         A reference to the vehicle to be modified.
    * @param energyLevel The vehicle's new energy level.
    * @return The modified vehicle.
    * @throws ObjectUnknownException If the referenced vehicle does not exist.
    */
   public Vehicle setVehicleEnergyLevel(TCSObjectReference<Vehicle> ref,
-                                       int energyLevel)
+                                       double energyLevel)
       throws ObjectUnknownException {
     Vehicle previousState = getObjectRepo().getObject(Vehicle.class, ref);
     Vehicle vehicle = previousState.withEnergyLevel(energyLevel);
     getObjectRepo().replaceObject(vehicle);
     emitObjectEvent(vehicle,
-                    previousState,
-                    TCSObjectEvent.Type.OBJECT_MODIFIED);
+        previousState,
+        TCSObjectEvent.Type.OBJECT_MODIFIED);
     return vehicle;
   }
 
   /**
    * Sets a vehicle's recharge operation.
    *
-   * @param ref A reference to the vehicle to be modified.
+   * @param ref               A reference to the vehicle to be modified.
    * @param rechargeOperation The vehicle's new recharge operation.
    * @return The modified vehicle.
    * @throws ObjectUnknownException If the referenced vehicle does not exist.
@@ -360,22 +365,22 @@ public class PlantModelManager
     Vehicle previousState = getObjectRepo().getObject(Vehicle.class, ref);
 
     LOG.info("Vehicle's recharge operation changes: {} -- {} -> {}",
-             previousState.getName(),
-             previousState.getRechargeOperation(),
-             rechargeOperation);
+        previousState.getName(),
+        previousState.getRechargeOperation(),
+        rechargeOperation);
 
     Vehicle vehicle = previousState.withRechargeOperation(rechargeOperation);
     getObjectRepo().replaceObject(vehicle);
     emitObjectEvent(vehicle,
-                    previousState,
-                    TCSObjectEvent.Type.OBJECT_MODIFIED);
+        previousState,
+        TCSObjectEvent.Type.OBJECT_MODIFIED);
     return vehicle;
   }
 
   /**
    * Sets a vehicle's load handling devices.
    *
-   * @param ref A reference to the vehicle to be modified.
+   * @param ref     A reference to the vehicle to be modified.
    * @param devices The vehicle's new load handling devices.
    * @return The modified vehicle.
    * @throws ObjectUnknownException If the referenced vehicle does not exist.
@@ -387,15 +392,15 @@ public class PlantModelManager
     Vehicle vehicle = previousState.withLoadHandlingDevices(devices);
     getObjectRepo().replaceObject(vehicle);
     emitObjectEvent(vehicle,
-                    previousState,
-                    TCSObjectEvent.Type.OBJECT_MODIFIED);
+        previousState,
+        TCSObjectEvent.Type.OBJECT_MODIFIED);
     return vehicle;
   }
 
   /**
    * Sets a vehicle's state.
    *
-   * @param ref A reference to the vehicle to be modified.
+   * @param ref      A reference to the vehicle to be modified.
    * @param newState The vehicle's new state.
    * @return The modified vehicle.
    * @throws ObjectUnknownException If the referenced vehicle does not exist.
@@ -406,22 +411,22 @@ public class PlantModelManager
     Vehicle previousState = getObjectRepo().getObject(Vehicle.class, ref);
 
     LOG.debug("Vehicle's state changes: {} -- {} -> {}",
-              previousState.getName(),
-              previousState.getState(),
-              newState);
+        previousState.getName(),
+        previousState.getState(),
+        newState);
 
     Vehicle vehicle = previousState.withState(newState);
     getObjectRepo().replaceObject(vehicle);
     emitObjectEvent(vehicle,
-                    previousState,
-                    TCSObjectEvent.Type.OBJECT_MODIFIED);
+        previousState,
+        TCSObjectEvent.Type.OBJECT_MODIFIED);
     return vehicle;
   }
 
   /**
    * Sets a vehicle's length.
    *
-   * @param ref A reference to the vehicle to be modified.
+   * @param ref       A reference to the vehicle to be modified.
    * @param newLength The vehicle's new length.
    * @return The modified vehicle.
    * @throws ObjectUnknownException If the referenced vehicle does not exist.
@@ -432,22 +437,22 @@ public class PlantModelManager
     Vehicle previousState = getObjectRepo().getObject(Vehicle.class, ref);
 
     LOG.debug("Vehicle's length changes: {} -- {} -> {}",
-              previousState.getName(),
-              previousState.getLength(),
-              newLength);
+        previousState.getName(),
+        previousState.getLength(),
+        newLength);
 
     Vehicle vehicle = previousState.withLength(newLength);
     getObjectRepo().replaceObject(vehicle);
     emitObjectEvent(vehicle,
-                    previousState,
-                    TCSObjectEvent.Type.OBJECT_MODIFIED);
+        previousState,
+        TCSObjectEvent.Type.OBJECT_MODIFIED);
     return vehicle;
   }
 
   /**
    * Sets a vehicle integration level.
    *
-   * @param ref A reference to the vehicle to be modified.
+   * @param ref              A reference to the vehicle to be modified.
    * @param integrationLevel The vehicle's new integration level.
    * @return The modified vehicle.
    * @throws ObjectUnknownException If the referenced vehicle does not exist.
@@ -458,22 +463,22 @@ public class PlantModelManager
     Vehicle previousState = getObjectRepo().getObject(Vehicle.class, ref);
 
     LOG.info("Vehicle's integration level changes: {} -- {} -> {}",
-             previousState.getName(),
-             previousState.getIntegrationLevel(),
-             integrationLevel);
+        previousState.getName(),
+        previousState.getIntegrationLevel(),
+        integrationLevel);
 
     Vehicle vehicle = previousState.withIntegrationLevel(integrationLevel);
     getObjectRepo().replaceObject(vehicle);
     emitObjectEvent(vehicle,
-                    previousState,
-                    TCSObjectEvent.Type.OBJECT_MODIFIED);
+        previousState,
+        TCSObjectEvent.Type.OBJECT_MODIFIED);
     return vehicle;
   }
 
   /**
    * Sets a vehicle's paused state.
    *
-   * @param ref A reference to the vehicle to be modified.
+   * @param ref    A reference to the vehicle to be modified.
    * @param paused The vehicle's new paused state.
    * @return The modified vehicle.
    * @throws ObjectUnknownException If the referenced vehicle does not exist.
@@ -484,22 +489,22 @@ public class PlantModelManager
     Vehicle previousState = getObjectRepo().getObject(Vehicle.class, ref);
 
     LOG.info("Vehicle's paused state changes: {} -- {} -> {}",
-             previousState.getName(),
-             previousState.isPaused(),
-             paused);
+        previousState.getName(),
+        previousState.isPaused(),
+        paused);
 
     Vehicle vehicle = previousState.withPaused(paused);
     getObjectRepo().replaceObject(vehicle);
     emitObjectEvent(vehicle,
-                    previousState,
-                    TCSObjectEvent.Type.OBJECT_MODIFIED);
+        previousState,
+        TCSObjectEvent.Type.OBJECT_MODIFIED);
     return vehicle;
   }
 
   /**
    * Sets a vehicle's processing state.
    *
-   * @param ref A reference to the vehicle to be modified.
+   * @param ref      A reference to the vehicle to be modified.
    * @param newState The vehicle's new processing state.
    * @return The modified vehicle.
    * @throws ObjectUnknownException If the referenced vehicle does not exist.
@@ -511,15 +516,15 @@ public class PlantModelManager
     Vehicle vehicle = previousState.withProcState(newState);
     getObjectRepo().replaceObject(vehicle);
     emitObjectEvent(vehicle,
-                    previousState,
-                    TCSObjectEvent.Type.OBJECT_MODIFIED);
+        previousState,
+        TCSObjectEvent.Type.OBJECT_MODIFIED);
     return vehicle;
   }
 
   /**
    * Sets the allowed order types for a given vehicle.
    *
-   * @param ref Reference to the vehicle.
+   * @param ref               Reference to the vehicle.
    * @param allowedOrderTypes Set of allowed order types.
    * @return The vehicle with the allowed order types.
    * @throws ObjectUnknownException The vehicle reference is not known.
@@ -530,22 +535,22 @@ public class PlantModelManager
     Vehicle previousState = getObjectRepo().getObject(Vehicle.class, ref);
 
     LOG.info("Vehicle's allowed order types change: {} -- {} -> {}",
-             previousState.getName(),
-             previousState.getAllowedOrderTypes(),
-             allowedOrderTypes);
+        previousState.getName(),
+        previousState.getAllowedOrderTypes(),
+        allowedOrderTypes);
 
     Vehicle vehicle = previousState.withAllowedOrderTypes(allowedOrderTypes);
     getObjectRepo().replaceObject(vehicle);
     emitObjectEvent(vehicle,
-                    previousState,
-                    TCSObjectEvent.Type.OBJECT_MODIFIED);
+        previousState,
+        TCSObjectEvent.Type.OBJECT_MODIFIED);
     return vehicle;
   }
 
   /**
    * Sets a vehicle's position.
    *
-   * @param ref A reference to the vehicle to be modified.
+   * @param ref       A reference to the vehicle to be modified.
    * @param newPosRef A reference to the point the vehicle is occupying.
    * @return The modified vehicle.
    * @throws ObjectUnknownException If the referenced vehicle does not exist.
@@ -556,9 +561,9 @@ public class PlantModelManager
     Vehicle vehicle = getObjectRepo().getObject(Vehicle.class, ref);
 
     LOG.debug("Vehicle's position changes: {} -- {} -> {}",
-              vehicle.getName(),
-              vehicle.getCurrentPosition() == null ? null : vehicle.getCurrentPosition().getName(),
-              newPosRef == null ? null : newPosRef.getName());
+        vehicle.getName(),
+        vehicle.getCurrentPosition() == null ? null : vehicle.getCurrentPosition().getName(),
+        newPosRef == null ? null : newPosRef.getName());
 
     Vehicle previousVehicleState = vehicle;
     // If the vehicle was occupying a point before, clear it and send an event.
@@ -568,8 +573,8 @@ public class PlantModelManager
       oldVehiclePos = oldVehiclePos.withOccupyingVehicle(null);
       getObjectRepo().replaceObject(oldVehiclePos);
       emitObjectEvent(oldVehiclePos,
-                      previousPointState,
-                      TCSObjectEvent.Type.OBJECT_MODIFIED);
+          previousPointState,
+          TCSObjectEvent.Type.OBJECT_MODIFIED);
     }
     // If the vehicle is occupying a point now, set that and send an event.
     if (newPosRef != null) {
@@ -578,14 +583,14 @@ public class PlantModelManager
       newVehiclePos = newVehiclePos.withOccupyingVehicle(ref);
       getObjectRepo().replaceObject(newVehiclePos);
       emitObjectEvent(newVehiclePos,
-                      previousPointState,
-                      TCSObjectEvent.Type.OBJECT_MODIFIED);
+          previousPointState,
+          TCSObjectEvent.Type.OBJECT_MODIFIED);
     }
     vehicle = vehicle.withCurrentPosition(newPosRef);
     getObjectRepo().replaceObject(vehicle);
     emitObjectEvent(vehicle,
-                    previousVehicleState,
-                    TCSObjectEvent.Type.OBJECT_MODIFIED);
+        previousVehicleState,
+        TCSObjectEvent.Type.OBJECT_MODIFIED);
 
     return vehicle;
   }
@@ -593,9 +598,9 @@ public class PlantModelManager
   /**
    * Sets a vehicle's next position.
    *
-   * @param ref A reference to the vehicle to be modified.
+   * @param ref         A reference to the vehicle to be modified.
    * @param newPosition A reference to the point the vehicle is expected to
-   * occupy next.
+   *                    occupy next.
    * @return The modified vehicle.
    * @throws ObjectUnknownException If the referenced vehicle does not exist.
    */
@@ -606,15 +611,15 @@ public class PlantModelManager
     Vehicle vehicle = previousState.withNextPosition(newPosition);
     getObjectRepo().replaceObject(vehicle);
     emitObjectEvent(vehicle,
-                    previousState,
-                    TCSObjectEvent.Type.OBJECT_MODIFIED);
+        previousState,
+        TCSObjectEvent.Type.OBJECT_MODIFIED);
     return vehicle;
   }
 
   /**
    * Sets a vehicle's precise position.
    *
-   * @param ref A reference to the vehicle to be modified.
+   * @param ref         A reference to the vehicle to be modified.
    * @param newPosition The vehicle's precise position.
    * @return The modified vehicle.
    * @throws ObjectUnknownException If the referenced vehicle does not exist.
@@ -626,15 +631,15 @@ public class PlantModelManager
     Vehicle vehicle = previousState.withPrecisePosition(newPosition);
     getObjectRepo().replaceObject(vehicle);
     emitObjectEvent(vehicle,
-                    previousState,
-                    TCSObjectEvent.Type.OBJECT_MODIFIED);
+        previousState,
+        TCSObjectEvent.Type.OBJECT_MODIFIED);
     return vehicle;
   }
 
   /**
    * Sets a vehicle's current orientation angle.
    *
-   * @param ref A reference to the vehicle to be modified.
+   * @param ref   A reference to the vehicle to be modified.
    * @param angle The vehicle's orientation angle.
    * @return The modified vehicle.
    * @throws ObjectUnknownException If the referenced vehicle does not exist.
@@ -646,8 +651,8 @@ public class PlantModelManager
     Vehicle vehicle = previousState.withOrientationAngle(angle);
     getObjectRepo().replaceObject(vehicle);
     emitObjectEvent(vehicle,
-                    previousState,
-                    TCSObjectEvent.Type.OBJECT_MODIFIED);
+        previousState,
+        TCSObjectEvent.Type.OBJECT_MODIFIED);
     return vehicle;
   }
 
@@ -655,7 +660,7 @@ public class PlantModelManager
    * Sets a vehicle's transport order.
    *
    * @param vehicleRef A reference to the vehicle to be modified.
-   * @param orderRef A reference to the transport order the vehicle processes.
+   * @param orderRef   A reference to the transport order the vehicle processes.
    * @return The modified vehicle.
    * @throws ObjectUnknownException If the referenced vehicle does not exist.
    */
@@ -667,15 +672,14 @@ public class PlantModelManager
     if (orderRef == null) {
       vehicle = vehicle.withTransportOrder(null);
       getObjectRepo().replaceObject(vehicle);
-    }
-    else {
+    } else {
       TransportOrder order = getObjectRepo().getObject(TransportOrder.class, orderRef);
       vehicle = vehicle.withTransportOrder(order.getReference());
       getObjectRepo().replaceObject(vehicle);
     }
     emitObjectEvent(vehicle,
-                    previousState,
-                    TCSObjectEvent.Type.OBJECT_MODIFIED);
+        previousState,
+        TCSObjectEvent.Type.OBJECT_MODIFIED);
     return vehicle;
   }
 
@@ -683,7 +687,7 @@ public class PlantModelManager
    * Sets a vehicle's order sequence.
    *
    * @param vehicleRef A reference to the vehicle to be modified.
-   * @param seqRef A reference to the order sequence the vehicle processes.
+   * @param seqRef     A reference to the order sequence the vehicle processes.
    * @return The modified vehicle.
    * @throws ObjectUnknownException If the referenced vehicle does not exist.
    */
@@ -695,15 +699,14 @@ public class PlantModelManager
     if (seqRef == null) {
       vehicle = vehicle.withOrderSequence(null);
       getObjectRepo().replaceObject(vehicle);
-    }
-    else {
+    } else {
       OrderSequence seq = getObjectRepo().getObject(OrderSequence.class, seqRef);
       vehicle = vehicle.withOrderSequence(seq.getReference());
       getObjectRepo().replaceObject(vehicle);
     }
     emitObjectEvent(vehicle,
-                    previousState,
-                    TCSObjectEvent.Type.OBJECT_MODIFIED);
+        previousState,
+        TCSObjectEvent.Type.OBJECT_MODIFIED);
     return vehicle;
   }
 
@@ -712,7 +715,7 @@ public class PlantModelManager
    * drive order of its current transport order.
    *
    * @param vehicleRef A reference to the vehicle to be modified.
-   * @param index The new index.
+   * @param index      The new index.
    * @return The modified vehicle.
    * @throws ObjectUnknownException If the referenced vehicle does not exist.
    */
@@ -723,8 +726,8 @@ public class PlantModelManager
     Vehicle vehicle = previousState.withRouteProgressIndex(index);
     getObjectRepo().replaceObject(vehicle);
     emitObjectEvent(vehicle,
-                    previousState,
-                    TCSObjectEvent.Type.OBJECT_MODIFIED);
+        previousState,
+        TCSObjectEvent.Type.OBJECT_MODIFIED);
     return vehicle;
   }
 
@@ -732,7 +735,7 @@ public class PlantModelManager
    * Sets a vehicle's claimed resources.
    *
    * @param vehicleRef A reference to the vehicle to be modified.
-   * @param resources The new resources.
+   * @param resources  The new resources.
    * @return The modified vehicle.
    * @throws ObjectUnknownException If the referenced vehicle does not exist.
    */
@@ -743,8 +746,8 @@ public class PlantModelManager
     Vehicle vehicle = previousState.withClaimedResources(unmodifiableCopy(resources));
     getObjectRepo().replaceObject(vehicle);
     emitObjectEvent(vehicle,
-                    previousState,
-                    TCSObjectEvent.Type.OBJECT_MODIFIED);
+        previousState,
+        TCSObjectEvent.Type.OBJECT_MODIFIED);
     return vehicle;
   }
 
@@ -752,7 +755,7 @@ public class PlantModelManager
    * Sets a vehicle's allocated resources.
    *
    * @param vehicleRef A reference to the vehicle to be modified.
-   * @param resources The new resources.
+   * @param resources  The new resources.
    * @return The modified vehicle.
    * @throws ObjectUnknownException If the referenced vehicle does not exist.
    */
@@ -763,8 +766,8 @@ public class PlantModelManager
     Vehicle vehicle = previousState.withAllocatedResources(unmodifiableCopy(resources));
     getObjectRepo().replaceObject(vehicle);
     emitObjectEvent(vehicle,
-                    previousState,
-                    TCSObjectEvent.Type.OBJECT_MODIFIED);
+        previousState,
+        TCSObjectEvent.Type.OBJECT_MODIFIED);
     return vehicle;
   }
 
@@ -796,7 +799,7 @@ public class PlantModelManager
    * @param resources The set of resources to be expanded.
    * @return The given set with resources expanded.
    * @throws ObjectUnknownException If an object referenced in the given set
-   * does not exist.
+   *                                does not exist.
    */
   public Set<TCSResource<?>> expandResources(@Nonnull Set<TCSResourceReference<?>> resources)
       throws ObjectUnknownException {
@@ -824,13 +827,233 @@ public class PlantModelManager
         .collect(Collectors.toSet());
   }
 
+  public void createTestModelObjects(String modelName, int vehicleNum, int minX, int maxX, int minY, int maxY)
+      throws ObjectExistsException, ObjectUnknownException {
+    LOG.info("Plant model is being created: {}", modelName);
+    clear();
+    setName(modelName);
+    int mask = round_up(maxX);
+
+    createPoints(minX, maxX, minY, maxY, mask);
+    createPaths(minX, maxX, minY, maxY, mask);
+    createLocationTypes();
+    createToteStacks(minX, maxX, minY, maxY, mask);
+    createVisualLayout();
+    createVehicles(vehicleNum);
+  }
+
+  private int round_up(int maxX) {
+    return (int) Math.pow(10, String.valueOf(maxX).length() + 1);
+  }
+
+  private Integer generateId(int x, int y, int mask) {
+    return x + y * mask;
+  }
+
+  private void createPoints(int minX, int maxX, int minY, int maxY, int mask) {
+    // 创建巷道点
+    for (int y = minY; y <= maxY; y += 3) {
+      for (int x = minX + 1; x < maxX; x++) {
+        long positionX = x * X_INTERVAL;
+        long positionY = y * Y_INTERVAL;
+        Point newPoint = new Point(NameConvertor.toPointName(generateId(x, y, mask)))
+            .withPosition(new Triple(positionX, positionY, 0))
+            .withType(Point.Type.HALT_POSITION)
+            .withVehicleOrientationAngle(isForward(y, minY) ? 0 : 180)
+            .withLayout(new Point.Layout(
+                new Couple(positionX, positionY), new Couple(LABEL_X_OFFSET, LABEL_Y_OFFSET), 0
+            ));
+        getObjectRepo().addObject(newPoint);
+        emitObjectEvent(newPoint, null, TCSObjectEvent.Type.OBJECT_CREATED);
+      }
+    }
+    // 创建通道点
+    for (int x : List.of(minX, maxX)) {
+      for (int y = minY; y <= maxY; y++) {
+        long positionX = x * X_INTERVAL;
+        long positionY = y * Y_INTERVAL;
+        Point newPoint = new Point(NameConvertor.toPointName(generateId(x, y, mask)))
+            .withPosition(new Triple(positionX, positionY, 0))
+            .withType(Point.Type.HALT_POSITION)
+            .withLayout(new Point.Layout(
+                new Couple(positionX, positionY), new Couple(LABEL_X_OFFSET, LABEL_Y_OFFSET), 0
+            ));
+        getObjectRepo().addObject(newPoint);
+        emitObjectEvent(newPoint, null, TCSObjectEvent.Type.OBJECT_CREATED);
+      }
+    }
+
+  }
+
+  private boolean isForward(int y, int minY) {
+    return (y - minY) / 3 % 2 == 1;
+  }
+
+  private void createPaths(int minX, int maxX, int minY, int maxY, int mask) {
+    // 创建正向巷道
+    for (int y = minY + 3 ; y <= maxY; y += 6) {
+      for (int x = minX; x < maxX; x++) {
+        Point srcPoint = getObjectRepo().getObject(Point.class, NameConvertor.toPointName(generateId(x, y, mask)));
+        Point destPoint = getObjectRepo().getObject(Point.class, NameConvertor.toPointName(generateId(x + 1, y, mask)));
+        addNewPath(srcPoint, destPoint, (int) X_INTERVAL);
+      }
+    }
+    // 创建反向巷道
+    for (int y = minY; y <= maxY; y += 6) {
+      for (int x = maxX; x > minX; x--) {
+        Point srcPoint = getObjectRepo().getObject(Point.class, NameConvertor.toPointName(generateId(x, y, mask)));
+        Point destPoint = getObjectRepo().getObject(Point.class, NameConvertor.toPointName(generateId(x - 1, y, mask)));
+        addNewPath(srcPoint, destPoint, (int) X_INTERVAL);
+      }
+    }
+    // 创建通道
+    for (int x : List.of(minX, maxX)) {
+      for (int y = minY; y < maxY; y++) {
+        Point srcPoint = getObjectRepo().getObject(Point.class, NameConvertor.toPointName(generateId(x, y, mask)));
+        Point destPoint = getObjectRepo().getObject(Point.class, NameConvertor.toPointName(generateId(x, y + 1, mask)));
+        addNewPath(srcPoint, destPoint, (int) Y_INTERVAL);
+      }
+    }
+  }
+
+  private void addNewPath(Point srcPoint, Point destPoint, int length) {
+    Path newPath = new Path(String.format("%s --- %s", srcPoint.getName(), destPoint.getName()),
+        srcPoint.getReference(),
+        destPoint.getReference())
+        .withLength(length)
+        .withMaxVelocity(MAX_VELOCITY)
+        .withMaxReverseVelocity(MAX_REVERSE_VELOCITY);
+
+    getObjectRepo().addObject(newPath);
+
+    emitObjectEvent(newPath,
+        null,
+        TCSObjectEvent.Type.OBJECT_CREATED);
+    addPointOutgoingPath(srcPoint.getReference(), newPath.getReference());
+    addPointIncomingPath(destPoint.getReference(), newPath.getReference());
+  }
+
+  private void createLocationTypes() {
+    LocationType toteStack = new LocationType("Tote Stack")
+        .withAllowedOperations(Arrays.asList(PROPVAL_LOAD_OPERATION_DEFAULT, PROPVAL_UNLOAD_OPERATION_DEFAULT))
+        .withLayout(new LocationType.Layout(LocationRepresentation.LOAD_TRANSFER_GENERIC));
+    LocationType workStation = new LocationType("Work Station")
+        .withAllowedOperations(List.of(PROPVAL_JOINT_OPERATION_DEFAULT))
+        .withLayout(new LocationType.Layout(LocationRepresentation.WORKING_GENERIC));
+    LocationType rechargeStation = new LocationType("Recharge Station")
+        .withAllowedOperations(Arrays.asList(PROPVAL_RECHARGE_OPERATION_DEFAULT, PROPVAL_STOP_RECHARGE_OPERATION_DEFAULT))
+        .withLayout(new LocationType.Layout(LocationRepresentation.RECHARGE_GENERIC));
+
+    getObjectRepo().addObject(toteStack);
+    emitObjectEvent(toteStack,
+        null,
+        TCSObjectEvent.Type.OBJECT_CREATED);
+    getObjectRepo().addObject(workStation);
+    emitObjectEvent(workStation,
+        null,
+        TCSObjectEvent.Type.OBJECT_CREATED);
+    getObjectRepo().addObject(rechargeStation);
+    emitObjectEvent(rechargeStation,
+        null,
+        TCSObjectEvent.Type.OBJECT_CREATED);
+  }
+
+  private void createToteStacks(int minX, int maxX, int minY, int maxY, int mask) {
+    // 创建正向巷道的左右侧堆塔
+    int id;
+    for (int y = minY + 3; y <= maxY; y += 6) {
+      id = generateId(minX + 2, y, mask);
+      for (int x = minX + 2; x <= maxX - 2; x++) {
+        Point point = getObjectRepo().getObject(Point.class, NameConvertor.toPointName(id));
+        createToteStack(point, id, 0, (int) Y_INTERVAL);  // 左侧堆塔
+        createToteStack(point, id++, 1, -(int) Y_INTERVAL);  // 右侧堆塔
+      }
+    }
+    // 创建反向巷道的左右侧堆塔
+    for (int y = minY; y <= maxY; y += 6) {
+      id = generateId(minX + 2, y, mask);
+      for (int x = minX + 2; x <= maxX - 2; x++) {
+        Point point = getObjectRepo().getObject(Point.class, NameConvertor.toPointName(id));
+        createToteStack(point, id, 0, -(int) Y_INTERVAL);  // 左侧堆塔
+        createToteStack(point, id++, 1, (int) Y_INTERVAL);  // 右侧堆塔
+      }
+    }
+  }
+
+  private void createToteStack(Point point, int nameID, int toteDirection, int offsetY) {
+    LocationType type = getObjectRepo().getObject(LocationType.class, "Tote Stack");
+    Location newLocation = new Location(NameConvertor.toStackName(nameID, toteDirection), type.getReference())
+        .withPosition(point.getPosition())
+        .withLayout(new Location.Layout(
+            new Couple(point.getPosition().getX(), point.getPosition().getY() + offsetY),
+            new Couple(LABEL_X_OFFSET, LABEL_Y_OFFSET),
+            LocationRepresentation.DEFAULT,
+            0
+        ));
+
+    Set<Location.Link> locationLinks = new HashSet<>();
+    Location.Link link = new Location.Link(newLocation.getReference(), point.getReference());
+    locationLinks.add(link);
+
+    newLocation = newLocation.withAttachedLinks(locationLinks);
+
+    getObjectRepo().addObject(newLocation);
+    emitObjectEvent(newLocation,
+        null,
+        TCSObjectEvent.Type.OBJECT_CREATED);
+
+    // Add the location's links to the respective points, too.
+    Set<Location.Link> pointLinks = new HashSet<>(point.getAttachedLinks());
+    pointLinks.add(link);
+    Point newPoint = point.withAttachedLinks(pointLinks);
+    getObjectRepo().replaceObject(newPoint);
+    emitObjectEvent(newPoint,
+        point,
+        TCSObjectEvent.Type.OBJECT_MODIFIED);
+  }
+
+
+  private VisualLayout createVisualLayout()
+      throws ObjectUnknownException, ObjectExistsException {
+    VisualLayout newLayout = new VisualLayout("VLayout-1")
+        .withScaleX(10)
+        .withScaleY(10)
+        .withLayers(List.of(new Layer(0, 0, true, "Default layer", 0)))
+        .withLayerGroups(List.of(new LayerGroup(0, "Default layer group", true)));
+
+    getObjectRepo().addObject(newLayout);
+    emitObjectEvent(newLayout,
+        null,
+        TCSObjectEvent.Type.OBJECT_CREATED);
+    // Return the newly created layout.
+    return newLayout;
+  }
+
+  private void createVehicles(int num) {
+    Random rand = new Random();
+    for (int i = 1; i <= num; i++) {
+      Vehicle newVehicle = new Vehicle(NameConvertor.toRobotName(i))
+          .withMaxVelocity(1500)
+          .withMaxReverseVelocity(1500)
+          .withLayout(new Vehicle.Layout(new Color(
+              rand.nextInt(256 - 80) + 80,
+              rand.nextInt(256 - 80) + 80,
+              rand.nextInt(256 - 80) + 80
+          )));
+      getObjectRepo().addObject(newVehicle);
+      emitObjectEvent(newVehicle,
+          null,
+          TCSObjectEvent.Type.OBJECT_CREATED);
+    }
+  }
+
   private List<PeripheralOperation> mapPeripheralOperationTOs(
       List<PeripheralOperationCreationTO> creationTOs) {
     return creationTOs.stream()
         .map(
             operationTO -> new PeripheralOperation(
                 getObjectRepo().getObject(Location.class,
-                                          operationTO.getLocationName()).getReference(),
+                    operationTO.getLocationName()).getReference(),
                 operationTO.getOperation(),
                 operationTO.getExecutionTrigger(),
                 operationTO.isCompletionRequired())
@@ -855,8 +1078,8 @@ public class PlantModelManager
               .withType(curPoint.getType())
               .withProperties(curPoint.getProperties())
               .withLayout(new PointCreationTO.Layout(curPoint.getLayout().getPosition(),
-                                                     curPoint.getLayout().getLabelOffset(),
-                                                     curPoint.getLayout().getLayerId()))
+                  curPoint.getLayout().getLabelOffset(),
+                  curPoint.getLayout().getLayerId()))
       );
     }
 
@@ -866,7 +1089,6 @@ public class PlantModelManager
   /**
    * Returns a list of {@link PathCreationTO Paths} for all paths in a model.
    *
-   * @param model The model data.
    * @return A list of {@link PathCreationTO Paths} for all paths in a model.
    */
   @SuppressWarnings("deprecation")
@@ -877,8 +1099,8 @@ public class PlantModelManager
     for (Path curPath : paths) {
       result.add(
           new PathCreationTO(curPath.getName(),
-                             curPath.getSourcePoint().getName(),
-                             curPath.getDestinationPoint().getName())
+              curPath.getSourcePoint().getName(),
+              curPath.getDestinationPoint().getName())
               .withLength(curPath.getLength())
               .withMaxVelocity(curPath.getMaxVelocity())
               .withMaxReverseVelocity(curPath.getMaxReverseVelocity())
@@ -886,8 +1108,8 @@ public class PlantModelManager
               .withPeripheralOperations(getPeripheralOperations(curPath))
               .withProperties(curPath.getProperties())
               .withLayout(new PathCreationTO.Layout(curPath.getLayout().getConnectionType(),
-                                                    curPath.getLayout().getControlPoints(),
-                                                    curPath.getLayout().getLayerId()))
+                  curPath.getLayout().getControlPoints(),
+                  curPath.getLayout().getLayerId()))
       );
     }
 
@@ -907,7 +1129,6 @@ public class PlantModelManager
   /**
    * Returns a list of {@link VehicleCreationTO Vehicles} for all vehicles in a model.
    *
-   * @param model The model data.
    * @return A list of {@link VehicleCreationTO Vehicles} for all vehicles in a model.
    */
   private List<VehicleCreationTO> getVehicles() {
@@ -936,7 +1157,6 @@ public class PlantModelManager
    * Returns a list of {@link LocationTypeCreationTO LocationTypes} for all location types in a
    * model.
    *
-   * @param model The model data.
    * @return A list of {@link LocationTypeCreationTO LocationTypes} for all location types in a
    * model.
    */
@@ -962,7 +1182,6 @@ public class PlantModelManager
   /**
    * Returns a list of {@link LocationCreationTO Locations} for all locations in a model.
    *
-   * @param model The model data.
    * @return A list of {@link LocationCreationTO Locations} for all locations in a model.
    */
   private List<LocationCreationTO> getLocations() {
@@ -972,18 +1191,18 @@ public class PlantModelManager
     for (Location curLoc : locations) {
       result.add(
           new LocationCreationTO(curLoc.getName(),
-                                 curLoc.getType().getName(),
-                                 curLoc.getPosition())
+              curLoc.getType().getName(),
+              curLoc.getPosition())
               .withLinks(curLoc.getAttachedLinks().stream()
                   .collect(Collectors.toMap(link -> link.getPoint().getName(),
-                                            Location.Link::getAllowedOperations)))
+                      Location.Link::getAllowedOperations)))
               .withLocked(curLoc.isLocked())
               .withProperties(curLoc.getProperties())
               .withLayout(
                   new LocationCreationTO.Layout(curLoc.getLayout().getPosition(),
-                                                curLoc.getLayout().getLabelOffset(),
-                                                curLoc.getLayout().getLocationRepresentation(),
-                                                curLoc.getLayout().getLayerId())
+                      curLoc.getLayout().getLabelOffset(),
+                      curLoc.getLayout().getLocationRepresentation(),
+                      curLoc.getLayout().getLayerId())
               )
       );
     }
@@ -994,7 +1213,6 @@ public class PlantModelManager
   /**
    * Returns a list of {@link BlockCreationTO Blocks} for all blocks in a model.
    *
-   * @param model The model data.
    * @return A list of {@link BlockCreationTO Blocks} for all blocks in a model.
    */
   private List<BlockCreationTO> getBlocks() {
@@ -1019,7 +1237,6 @@ public class PlantModelManager
   /**
    * Returns a list of GroupCreationTOs for all groups in a model.
    *
-   * @param model The model data.
    * @return A list of GroupCreationTOs for all groups in a model.
    */
   @Deprecated
@@ -1044,14 +1261,13 @@ public class PlantModelManager
   /**
    * Returns a {@link VisualLayoutCreationTO} for the visual layouts in a model.
    *
-   * @param model The model data.
    * @return A {@link VisualLayoutCreationTO} for the visual layouts in a model.
    */
   private VisualLayoutCreationTO getVisualLayout() {
     Set<VisualLayout> layouts = getObjectRepo().getObjects(VisualLayout.class);
     checkState(layouts.size() == 1,
-               "There has to be one, and only one, visual layout. Number of visual layouts: %d",
-               layouts.size());
+        "There has to be one, and only one, visual layout. Number of visual layouts: %d",
+        layouts.size());
     VisualLayout layout = layouts.iterator().next();
 
     return new VisualLayoutCreationTO(layout.getName())
@@ -1068,7 +1284,7 @@ public class PlantModelManager
    *
    * @param to The transfer object from which to create the new layout.
    * @return The newly created layout.
-   * @throws ObjectExistsException If an object with the new object's name already exists.
+   * @throws ObjectExistsException  If an object with the new object's name already exists.
    * @throws ObjectUnknownException If any object referenced in the TO does not exist.
    */
   private VisualLayout createVisualLayout(VisualLayoutCreationTO to)
@@ -1081,8 +1297,8 @@ public class PlantModelManager
 
     getObjectRepo().addObject(newLayout);
     emitObjectEvent(newLayout,
-                    null,
-                    TCSObjectEvent.Type.OBJECT_CREATED);
+        null,
+        TCSObjectEvent.Type.OBJECT_CREATED);
     // Return the newly created layout.
     return newLayout;
   }
@@ -1104,8 +1320,8 @@ public class PlantModelManager
         .withVehicleOrientationAngle(to.getVehicleOrientationAngle())
         .withProperties(to.getProperties())
         .withLayout(new Point.Layout(to.getLayout().getPosition(),
-                                     to.getLayout().getLabelOffset(),
-                                     to.getLayout().getLayerId()));
+            to.getLayout().getLabelOffset(),
+            to.getLayout().getLayerId()));
     getObjectRepo().addObject(newPoint);
     emitObjectEvent(newPoint, null, TCSObjectEvent.Type.OBJECT_CREATED);
     // Return the newly created point.
@@ -1118,7 +1334,7 @@ public class PlantModelManager
    * @param to The transfer object from which to create the new path.
    * @return The newly created path.
    * @throws ObjectUnknownException If the referenced point does not exist.
-   * @throws ObjectExistsException If an object with the same name as the path already exists.
+   * @throws ObjectExistsException  If an object with the same name as the path already exists.
    */
   private Path createPath(PathCreationTO to)
       throws ObjectUnknownException, ObjectExistsException {
@@ -1127,8 +1343,8 @@ public class PlantModelManager
     Point srcPoint = getObjectRepo().getObject(Point.class, to.getSrcPointName());
     Point destPoint = getObjectRepo().getObject(Point.class, to.getDestPointName());
     Path newPath = new Path(to.getName(),
-                            srcPoint.getReference(),
-                            destPoint.getReference())
+        srcPoint.getReference(),
+        destPoint.getReference())
         .withLength(to.getLength())
         .withMaxVelocity(to.getMaxVelocity())
         .withMaxReverseVelocity(to.getMaxReverseVelocity())
@@ -1136,14 +1352,14 @@ public class PlantModelManager
         .withProperties(to.getProperties())
         .withLocked(to.isLocked())
         .withLayout(new Path.Layout(to.getLayout().getConnectionType(),
-                                    to.getLayout().getControlPoints(),
-                                    to.getLayout().getLayerId()));
+            to.getLayout().getControlPoints(),
+            to.getLayout().getLayerId()));
 
     getObjectRepo().addObject(newPath);
 
     emitObjectEvent(newPath,
-                    null,
-                    TCSObjectEvent.Type.OBJECT_CREATED);
+        null,
+        TCSObjectEvent.Type.OBJECT_CREATED);
 
     addPointOutgoingPath(srcPoint.getReference(), newPath.getReference());
     addPointIncomingPath(destPoint.getReference(), newPath.getReference());
@@ -1168,8 +1384,8 @@ public class PlantModelManager
         .withLayout(new LocationType.Layout(to.getLayout().getLocationRepresentation()));
     getObjectRepo().addObject(newType);
     emitObjectEvent(newType,
-                    null,
-                    TCSObjectEvent.Type.OBJECT_CREATED);
+        null,
+        TCSObjectEvent.Type.OBJECT_CREATED);
     return newType;
   }
 
@@ -1179,7 +1395,7 @@ public class PlantModelManager
    *
    * @param to The transfer object from which to create the new location type.
    * @return The newly created location.
-   * @throws ObjectExistsException If an object with the new object's name already exists.
+   * @throws ObjectExistsException  If an object with the new object's name already exists.
    * @throws ObjectUnknownException If any object referenced in the TO does not exist.
    */
   private Location createLocation(LocationCreationTO to)
@@ -1190,9 +1406,9 @@ public class PlantModelManager
         .withLocked(to.isLocked())
         .withProperties(to.getProperties())
         .withLayout(new Location.Layout(to.getLayout().getPosition(),
-                                        to.getLayout().getLabelOffset(),
-                                        to.getLayout().getLocationRepresentation(),
-                                        to.getLayout().getLayerId()));
+            to.getLayout().getLabelOffset(),
+            to.getLayout().getLocationRepresentation(),
+            to.getLayout().getLayerId()));
 
     Set<Location.Link> locationLinks = new HashSet<>();
     for (Map.Entry<String, Set<String>> linkEntry : to.getLinks().entrySet()) {
@@ -1205,8 +1421,8 @@ public class PlantModelManager
 
     getObjectRepo().addObject(newLocation);
     emitObjectEvent(newLocation,
-                    null,
-                    TCSObjectEvent.Type.OBJECT_CREATED);
+        null,
+        TCSObjectEvent.Type.OBJECT_CREATED);
 
     // Add the location's links to the respective points, too.
     for (Location.Link link : locationLinks) {
@@ -1220,8 +1436,8 @@ public class PlantModelManager
       getObjectRepo().replaceObject(point);
 
       emitObjectEvent(point,
-                      previousPointState,
-                      TCSObjectEvent.Type.OBJECT_MODIFIED);
+          previousPointState,
+          TCSObjectEvent.Type.OBJECT_MODIFIED);
     }
 
     return newLocation;
@@ -1249,8 +1465,8 @@ public class PlantModelManager
         .withLayout(new Vehicle.Layout(to.getLayout().getRouteColor()));
     getObjectRepo().addObject(newVehicle);
     emitObjectEvent(newVehicle,
-                    null,
-                    TCSObjectEvent.Type.OBJECT_CREATED);
+        null,
+        TCSObjectEvent.Type.OBJECT_CREATED);
     return newVehicle;
   }
 
@@ -1260,7 +1476,7 @@ public class PlantModelManager
    *
    * @param to The transfer object from which to create the new block.
    * @return The newly created block.
-   * @throws ObjectExistsException If an object with the new object's name already exists.
+   * @throws ObjectExistsException  If an object with the new object's name already exists.
    * @throws ObjectUnknownException If any object referenced in the TO does not exist.
    */
   private Block createBlock(BlockCreationTO to)
@@ -1280,8 +1496,8 @@ public class PlantModelManager
         .withLayout(new Block.Layout(to.getLayout().getColor()));
     getObjectRepo().addObject(newBlock);
     emitObjectEvent(newBlock,
-                    null,
-                    TCSObjectEvent.Type.OBJECT_CREATED);
+        null,
+        TCSObjectEvent.Type.OBJECT_CREATED);
     // Return the newly created block.
     return newBlock;
   }
@@ -1292,7 +1508,7 @@ public class PlantModelManager
    *
    * @param to The transfer object from which to create the new group.
    * @return The newly created group.
-   * @throws ObjectExistsException If an object with the new object's name already exists.
+   * @throws ObjectExistsException  If an object with the new object's name already exists.
    * @throws ObjectUnknownException If any object referenced in the TO does not exist.
    */
   @Deprecated
@@ -1311,8 +1527,8 @@ public class PlantModelManager
         .withProperties(to.getProperties());
     getObjectRepo().addObject(newGroup);
     emitObjectEvent(newGroup,
-                    null,
-                    TCSObjectEvent.Type.OBJECT_CREATED);
+        null,
+        TCSObjectEvent.Type.OBJECT_CREATED);
     // Return the newly created group.
     return newGroup;
   }
@@ -1327,23 +1543,19 @@ public class PlantModelManager
   @ScheduledApiChange(details = "Will be removed.", when = "6.0")
   private void overrideLayoutData(VisualLayoutCreationTO layout) {
     for (org.opentcs.access.to.model.ModelLayoutElementCreationTO mleTO
-             : layout.getModelElements()) {
+        : layout.getModelElements()) {
       TCSObject<?> object = getObjectRepo().getObject(mleTO.getName());
       Map<String, String> props = mleTO.getProperties();
 
       if (object instanceof Point) {
         overridePointLayoutData((Point) object, props);
-      }
-      else if (object instanceof Path) {
+      } else if (object instanceof Path) {
         overridePathLayoutData((Path) object, props);
-      }
-      else if (object instanceof Location) {
+      } else if (object instanceof Location) {
         overrideLocationLayoutData((Location) object, props);
-      }
-      else if (object instanceof Block) {
+      } else if (object instanceof Block) {
         overrideBlockLayoutData((Block) object, props);
-      }
-      else if (object instanceof Vehicle) {
+      } else if (object instanceof Vehicle) {
         overrideVehicleLayoutData((Vehicle) object, props);
       }
     }
@@ -1365,8 +1577,8 @@ public class PlantModelManager
         : oldPoint.getLayout().getLabelOffset().getY();
     Point newPoint = oldPoint.withLayout(
         new Point.Layout(new Couple(positionX, positionY),
-                         new Couple(labelOffsetX, labelOffsetY),
-                         oldPoint.getLayout().getLayerId())
+            new Couple(labelOffsetX, labelOffsetY),
+            oldPoint.getLayout().getLayerId())
     );
     getObjectRepo().replaceObject(newPoint);
     emitObjectEvent(newPoint, oldPoint, TCSObjectEvent.Type.OBJECT_MODIFIED);
@@ -1376,7 +1588,7 @@ public class PlantModelManager
       throws IllegalArgumentException {
     String connectionTypeString
         = properties.getOrDefault(ElementPropKeys.PATH_CONN_TYPE,
-                                  oldPath.getLayout().getConnectionType().name());
+        oldPath.getLayout().getConnectionType().name());
     Path.Layout.ConnectionType connectionType;
     switch (connectionTypeString) {
       case "DIRECT":
@@ -1408,14 +1620,14 @@ public class PlantModelManager
           .map(controlPointString -> {
             String[] coordinateStrings = controlPointString.split(",");
             return new Couple(Long.parseLong(coordinateStrings[0]),
-                              Long.parseLong(coordinateStrings[1]));
+                Long.parseLong(coordinateStrings[1]));
           })
           .collect(Collectors.toList());
     }
 
     Path newPath = oldPath.withLayout(new Path.Layout(connectionType,
-                                                      controlPoints,
-                                                      oldPath.getLayout().getLayerId()));
+        controlPoints,
+        oldPath.getLayout().getLayerId()));
 
     getObjectRepo().replaceObject(newPath);
     emitObjectEvent(newPath, oldPath, TCSObjectEvent.Type.OBJECT_MODIFIED);
@@ -1437,9 +1649,9 @@ public class PlantModelManager
         : oldLocation.getLayout().getLabelOffset().getY();
     Location newLocation = oldLocation.withLayout(
         new Location.Layout(new Couple(positionX, positionY),
-                            new Couple(labelOffsetX, labelOffsetY),
-                            oldLocation.getLayout().getLocationRepresentation(),
-                            oldLocation.getLayout().getLayerId())
+            new Couple(labelOffsetX, labelOffsetY),
+            oldLocation.getLayout().getLocationRepresentation(),
+            oldLocation.getLayout().getLayerId())
     );
     getObjectRepo().replaceObject(newLocation);
     emitObjectEvent(newLocation, oldLocation, TCSObjectEvent.Type.OBJECT_MODIFIED);
@@ -1470,10 +1682,10 @@ public class PlantModelManager
    * Adds an incoming path to a point.
    *
    * @param pointRef A reference to the point to be modified.
-   * @param pathRef A reference to the path.
+   * @param pathRef  A reference to the path.
    * @return The modified point.
    * @throws ObjectUnknownException If the referenced point or path do not
-   * exist.
+   *                                exist.
    */
   private Point addPointIncomingPath(TCSObjectReference<Point> pointRef,
                                      TCSObjectReference<Path> pathRef)
@@ -1490,8 +1702,8 @@ public class PlantModelManager
     point = point.withIncomingPaths(incomingPaths);
     getObjectRepo().replaceObject(point);
     emitObjectEvent(point,
-                    previousState,
-                    TCSObjectEvent.Type.OBJECT_MODIFIED);
+        previousState,
+        TCSObjectEvent.Type.OBJECT_MODIFIED);
     return point;
   }
 
@@ -1499,10 +1711,10 @@ public class PlantModelManager
    * Adds an outgoing path to a point.
    *
    * @param pointRef A reference to the point to be modified.
-   * @param pathRef A reference to the path.
+   * @param pathRef  A reference to the path.
    * @return The modified point.
    * @throws ObjectUnknownException If the referenced point or path do not
-   * exist.
+   *                                exist.
    */
   private Point addPointOutgoingPath(TCSObjectReference<Point> pointRef,
                                      TCSObjectReference<Path> pathRef)
@@ -1519,8 +1731,8 @@ public class PlantModelManager
     point = point.withOutgoingPaths(outgoingPaths);
     getObjectRepo().replaceObject(point);
     emitObjectEvent(point,
-                    previousState,
-                    TCSObjectEvent.Type.OBJECT_MODIFIED);
+        previousState,
+        TCSObjectEvent.Type.OBJECT_MODIFIED);
     return point;
   }
 

@@ -1,6 +1,6 @@
 /**
  * Copyright (c) The openTCS Authors.
- *
+ * <p>
  * This program is free software and subject to the MIT license. (For details,
  * see the licensing information (LICENSE.txt) you should have received with
  * this copy of the software.)
@@ -8,10 +8,14 @@
 package org.opentcs.kernel.services;
 
 import static com.google.common.base.Strings.isNullOrEmpty;
+
 import java.util.Map;
+
 import static java.util.Objects.requireNonNull;
+
 import java.util.Set;
 import javax.inject.Inject;
+
 import org.opentcs.access.Kernel;
 import org.opentcs.access.KernelRuntimeException;
 import org.opentcs.access.LocalKernel;
@@ -114,7 +118,8 @@ public class StandardPlantModelService
       throws IllegalStateException {
     synchronized (globalSyncObject) {
       if (!modelPersister.hasSavedModel()) {
-        createPlantModel(new PlantModelCreationTO(Kernel.DEFAULT_MODEL_NAME));
+        createTestModel("olice", 4, 17, 45, 2, 17);
+//        createPlantModel(new PlantModelCreationTO(Kernel.DEFAULT_MODEL_NAME));
         return;
       }
 
@@ -131,7 +136,7 @@ public class StandardPlantModelService
       emitModelEvent(oldModelName, newModelName, true, true);
       notificationService.publishUserNotification(
           new UserNotification("Kernel loaded model " + newModelName,
-                               UserNotification.Level.INFORMATIONAL));
+              UserNotification.Level.INFORMATIONAL));
     }
   }
 
@@ -186,7 +191,37 @@ public class StandardPlantModelService
     emitModelEvent(oldModelName, to.getName(), true, true);
     notificationService.publishUserNotification(
         new UserNotification("Kernel created model " + to.getName(),
-                             UserNotification.Level.INFORMATIONAL));
+            UserNotification.Level.INFORMATIONAL));
+  }
+
+  private void createTestModel(String modelName, int vehicleNum, int minX, int maxX, int minY, int maxY)
+      throws ObjectUnknownException, ObjectExistsException, IllegalStateException {
+
+    boolean kernelInOperating = kernel.getState() == Kernel.State.OPERATING;
+    // If we are in state operating, change the kernel state before creating the plant model
+    if (kernelInOperating) {
+      kernel.setState(Kernel.State.MODELLING);
+    }
+
+    String oldModelName = getModelName();
+    emitModelEvent(oldModelName, modelName, true, false);
+
+    // Create the plant model
+    synchronized (globalSyncObject) {
+      plantModelManager.createTestModelObjects(modelName, vehicleNum, minX, maxX, minY, maxY);
+    }
+
+    savePlantModel();
+
+    // If we were in state operating before, change the kernel state back to operating
+    if (kernelInOperating) {
+      kernel.setState(Kernel.State.OPERATING);
+    }
+
+    emitModelEvent(oldModelName, modelName, true, true);
+    notificationService.publishUserNotification(
+        new UserNotification("Kernel created model " + modelName,
+            UserNotification.Level.INFORMATIONAL));
   }
 
   @Override
@@ -236,8 +271,8 @@ public class StandardPlantModelService
     requireNonNull(newModelName, "newModelName");
 
     eventHandler.onEvent(new ModelTransitionEvent(oldModelName,
-                                                  newModelName,
-                                                  modelContentChanged,
-                                                  transitionFinished));
+        newModelName,
+        modelContentChanged,
+        transitionFinished));
   }
 }
