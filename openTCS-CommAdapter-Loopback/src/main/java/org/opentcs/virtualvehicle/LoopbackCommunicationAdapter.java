@@ -31,6 +31,7 @@ import org.opentcs.components.kernel.services.InternalTransportOrderService;
 import org.opentcs.components.kernel.services.InternalVehicleService;
 import org.opentcs.customizations.ApplicationEventBus;
 import org.opentcs.customizations.kernel.KernelExecutor;
+import org.opentcs.data.model.Point;
 import org.opentcs.data.model.Vehicle;
 import org.opentcs.data.order.Route.Step;
 import org.opentcs.data.order.TransportOrder;
@@ -96,6 +97,7 @@ public class LoopbackCommunicationAdapter
   private final Vehicle vehicle;
 
   private final SocketClient socketClient;
+  private final InternalVehicleService vehicleService;
   /**
    * The vehicle's load state.
    */
@@ -124,11 +126,16 @@ public class LoopbackCommunicationAdapter
                                       @Nonnull InternalTransportOrderService orderService,
                                       @Nonnull DispatcherService dispatcherService,
                                       @Nonnull InternalVehicleService vehicleService) {
-    super(new LoopbackVehicleModel(vehicle, configuration.defaultRechargingTime()),
+    super(new LoopbackVehicleModel(
+            vehicle,
+            configuration.defaultAcceleration(),
+            configuration.defaultDeceleration(),
+            configuration.defaultOperatingTime(),
+            configuration.defaultRechargingTime()),
         configuration.commandQueueCapacity(),
         1,
-        configuration.rechargeOperation(),
-        configuration.stopRechargeOperation(),
+        LoopbackAdapterConstants.PROPVAL_RECHARGE_OPERATION_DEFAULT,
+        LoopbackAdapterConstants.PROPVAL_STOP_RECHARGE_OPERATION_DEFAULT,
         kernelExecutor);
     this.vehicle = requireNonNull(vehicle, "vehicle");
     this.configuration = requireNonNull(configuration, "configuration");
@@ -143,6 +150,7 @@ public class LoopbackCommunicationAdapter
         serverIp != null ? serverIp : configuration.socketServerIp(),
         serverPort != null ? serverPort : configuration.socketServerPort()
     );
+    this.vehicleService = requireNonNull(vehicleService);
   }
 
   @Override
@@ -389,6 +397,9 @@ public class LoopbackCommunicationAdapter
     } else {
       //if the way enties are different then we have finished this step
       //and we can move on.
+      getProcessModel().setVehicleOrientationAngle(
+          calculateAngle(getProcessModel().getVehiclePosition(), prevWayEntry.getDestPointName())
+      );
       getProcessModel().setVehiclePosition(prevWayEntry.getDestPointName());
       LOG.debug("Movement simulation finished.");
       if (!command.isWithoutOperation()) {
@@ -400,6 +411,22 @@ public class LoopbackCommunicationAdapter
         finishVehicleSimulation(command);
       }
     }
+  }
+
+  private double calculateAngle(String srcPointName, String destPointName) {
+    // 若目标点有指定Angle, 则使用该Angle
+    Point destPoint = requireNonNull(vehicleService.fetchObject(Point.class, destPointName));
+    if (!Double.isNaN(destPoint.getVehicleOrientationAngle()))
+      return destPoint.getVehicleOrientationAngle();
+    // 若起始点有指定Angle, 则使用该Angle
+    Point srcPoint = requireNonNull(vehicleService.fetchObject(Point.class, srcPointName));
+    if (!Double.isNaN(srcPoint.getVehicleOrientationAngle()))
+      return srcPoint.getVehicleOrientationAngle();
+    // 若两点均无指定Angle, 则根据两点坐标计算Angle
+    return Math.toDegrees(Math.atan2(
+        destPoint.getPosition().getY() - srcPoint.getPosition().getY(),
+        destPoint.getPosition().getX() - srcPoint.getPosition().getX()
+    ));
   }
 
   private void operationSimulation(MovementCommand command) {
@@ -457,7 +484,7 @@ public class LoopbackCommunicationAdapter
       return;
 
     double oriEnergyLevel = getProcessModel().getVehicleEnergyLevel();
-    if (oriEnergyLevel < 100){
+    if (oriEnergyLevel < 100) {
       double increment = (chargingTime / getProcessModel().getFullRechargingTime()) * 100;
       double curEnergyLevel = Math.min(oriEnergyLevel + increment, 100.0);
       getProcessModel().setVehicleEnergyLevel(curEnergyLevel);
