@@ -118,8 +118,8 @@ public class StandardPlantModelService
       throws IllegalStateException {
     synchronized (globalSyncObject) {
       if (!modelPersister.hasSavedModel()) {
-        createTestModel("olice", 4, 17, 45, 2, 17);
-//        createPlantModel(new PlantModelCreationTO(Kernel.DEFAULT_MODEL_NAME));
+//        createTestModel("olice", 4, 17, 45, 2, 17);
+        createPlantModel(new PlantModelCreationTO(Kernel.DEFAULT_MODEL_NAME));
         return;
       }
 
