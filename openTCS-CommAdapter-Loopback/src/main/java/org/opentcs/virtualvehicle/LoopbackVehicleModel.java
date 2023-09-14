@@ -26,10 +26,6 @@ public class LoopbackVehicleModel
    */
   private boolean singleStepModeEnabled;
   /**
-   * Indicates whether this virtual vehicle is connected to a charger or not.
-   */
-  private volatile boolean chargerConnected = false;
-  /**
    * Indicates which operation is a loading operation.
    */
   private final String loadOperation;
@@ -291,14 +287,6 @@ public class LoopbackVehicleModel
     getPropertyChangeSupport().firePropertyChange(Attribute.VEHICLE_PAUSED.name(),
         oldValue,
         pause);
-  }
-
-  public synchronized boolean isChargerConnected() {
-    return chargerConnected;
-  }
-
-  public synchronized void setChargerConnected(boolean chargerConnected) {
-    this.chargerConnected = chargerConnected;
   }
 
   /**

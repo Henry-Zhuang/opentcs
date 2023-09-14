@@ -30,6 +30,7 @@ public class MessageGenerator {
     Heartbeat.HeartbeatParams params = new Heartbeat.HeartbeatParams();
 
     params.setRobotID(NameConvertor.toRobotId(vehicleModel.getName()));
+    params.setUniqueID(vehicleModel.getUniqueId());
     params.setStatus(0);
     params.setPosition(NameConvertor.toPointId(vehicleModel.getVehiclePosition()));
     double theta = vehicleModel.getVehicleOrientationAngle();
@@ -40,6 +41,8 @@ public class MessageGenerator {
     params.setToday_odo(20.0);
     Heartbeat.HeartbeatParams.BatteryInfo batteryInfo = new Heartbeat.HeartbeatParams.BatteryInfo();
     batteryInfo.setPercentage(vehicleModel.getVehicleEnergyLevel());
+    batteryInfo.setChargerConnected(vehicleModel.isChargerConnected());
+    batteryInfo.setChargingStatus(vehicleModel.isChargerConnected());
     params.setBatteryInfo(batteryInfo);
 
     Heartbeat hb = new Heartbeat();

@@ -488,10 +488,13 @@ public class LoopbackCommunicationAdapter
       double increment = (chargingTime / getProcessModel().getFullRechargingTime()) * 100;
       double curEnergyLevel = Math.min(oriEnergyLevel + increment, 100.0);
       getProcessModel().setVehicleEnergyLevel(curEnergyLevel);
+      ((ScheduledExecutorService) getExecutor()).schedule(() -> energyGrowSimulation(getSimulationTimeStep()),
+          SIMULATION_TASKS_DELAY,
+          TimeUnit.MILLISECONDS);
+    } else {
+      getProcessModel().setChargerConnected(false);
+      getProcessModel().setVehicleState(Vehicle.State.CHARGING);
     }
-    ((ScheduledExecutorService) getExecutor()).schedule(() -> energyGrowSimulation(getSimulationTimeStep()),
-        SIMULATION_TASKS_DELAY,
-        TimeUnit.MILLISECONDS);
   }
 
   private void energyConsumeSimulation(int runningTime) {

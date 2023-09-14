@@ -29,6 +29,8 @@ import java.util.stream.Stream;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
+
+import org.opentcs.common.rms.NameConvertor;
 import org.opentcs.components.kernel.ResourceAllocationException;
 import org.opentcs.components.kernel.Scheduler;
 import org.opentcs.components.kernel.services.DispatcherService;
@@ -313,6 +315,7 @@ public class DefaultVehicleController
       // order.
       transportOrder = newOrder;
       setDriveOrder(transportOrder.getCurrentDriveOrder(), transportOrder.getProperties());
+      commAdapter.getProcessModel().setUniqueId(NameConvertor.toCommandId(newOrder.getName()));
     }
     else {
       // We received an update for a drive order we're already processing.

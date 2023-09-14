@@ -331,12 +331,16 @@ public class SocketClient implements EventHandler, Lifecycle {
     checkArgument(targetIds.size() == 2, "move targetIds size should be 2");
 
     // 创建指令记录，并执行指令
-    List<DestinationCreationTO> destinations = new ArrayList<>(targetIds.size());
-    targetIds.forEach(targetID -> destinations.add(
-        new DestinationCreationTO(
-            NameConvertor.toPointName(targetID.getLocation()),
-            cmd.getType()
-        )
+//    List<DestinationCreationTO> destinations = new ArrayList<>(targetIds.size());
+//    targetIds.forEach(targetID -> destinations.add(
+//        new DestinationCreationTO(
+//            NameConvertor.toPointName(targetID.getLocation()),
+//            cmd.getType()
+//        )
+//    ));
+    List<DestinationCreationTO> destinations = List.of(new DestinationCreationTO(
+        NameConvertor.toPointName(targetIds.get(1).getLocation()),
+        cmd.getType()
     ));
     TransportOrderCreationTO orderTO
         = new TransportOrderCreationTO(NameConvertor.toCommandName(cmd.getParams().getUniqueID()), destinations)
@@ -350,11 +354,11 @@ public class SocketClient implements EventHandler, Lifecycle {
     // 参数校验
     List<Command.CommandParams.TargetID> targetIds
         = requireNonNull(cmd.getParams().getTargetID(), "targetIds");
-    checkArgument(targetIds.size() == 2, "charge targetIds size should be 2");
+    checkArgument(targetIds.size() == 1, "charge targetIds size should be 1");
 
     // 创建指令记录，并执行指令
     List<DestinationCreationTO> destinations = new ArrayList<>(1);
-    String destName = NameConvertor.toRechargeName(targetIds.get(1).getLocation());
+    String destName = NameConvertor.toRechargeName(targetIds.get(0).getLocation());
     String type = cmd.getParams().getCommand() == 1 ?
         Command.Type.CHARGE.getType() : Command.Type.STOP_CHARGE.getType();
     destinations.add(new DestinationCreationTO(destName, type));  // 终点
@@ -363,6 +367,10 @@ public class SocketClient implements EventHandler, Lifecycle {
         .withIntendedVehicleName(getVehicleName())
         .withType(type);
     orderService.createTransportOrder(orderTO);
+    if (type.equals(Command.Type.STOP_CHARGE.getType())
+        && vehicleModel.getVehicleState().equals(Vehicle.State.CHARGING)) {
+      vehicleModel.setVehicleState(Vehicle.State.IDLE);
+    }
     dispatcherService.dispatch();
   }
 

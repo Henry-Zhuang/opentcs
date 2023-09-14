@@ -19,6 +19,7 @@ import static java.util.Objects.requireNonNull;
 import java.util.Queue;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import com.google.common.primitives.UnsignedLong;
 import org.opentcs.data.TCSObjectReference;
 import org.opentcs.data.model.Triple;
 import org.opentcs.data.model.Vehicle;
@@ -95,6 +96,14 @@ public class VehicleProcessModel {
    * The vehicle's current length.
    */
   private int length;
+  /**
+   * Indicates whether this virtual vehicle is connected to a charger or not.
+   */
+  private volatile boolean chargerConnected = false;
+  /**
+   * The uniqueId of vehicle's current command.
+   */
+  private volatile UnsignedLong uniqueId;
 
   /**
    * Creates a new instance.
@@ -432,6 +441,22 @@ public class VehicleProcessModel {
     getPropertyChangeSupport().firePropertyChange(Attribute.LENGTH.name(),
                                                   oldValue,
                                                   length);
+  }
+
+  public synchronized boolean isChargerConnected() {
+    return chargerConnected;
+  }
+
+  public synchronized void setChargerConnected(boolean chargerConnected) {
+    this.chargerConnected = chargerConnected;
+  }
+
+  public synchronized UnsignedLong getUniqueId() {
+    return uniqueId;
+  }
+
+  public synchronized void setUniqueId(UnsignedLong uniqueId) {
+    this.uniqueId = uniqueId;
   }
 
   /**
