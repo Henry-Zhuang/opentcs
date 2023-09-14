@@ -3,6 +3,10 @@ apply from: "${rootDir}/gradle/java-codequality.gradle"
 apply from: "${rootDir}/gradle/publishing-java.gradle"
 apply plugin: 'org.kordamp.gradle.stats'
 
+dependencies {
+  implementation 'com.google.guava:guava:31.1-jre'
+}
+
 task release {
   dependsOn build
 }
