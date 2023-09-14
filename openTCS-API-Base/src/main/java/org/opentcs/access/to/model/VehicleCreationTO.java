@@ -64,9 +64,9 @@ public class VehicleCreationTO
   public VehicleCreationTO(@Nonnull String name) {
     super(name);
     this.length = 1000;
-    this.energyLevelCritical = 30;
+    this.energyLevelCritical = 5;
     this.energyLevelGood = 90;
-    this.energyLevelFullyRecharged = 90;
+    this.energyLevelFullyRecharged = 100;
     this.energyLevelSufficientlyRecharged = 30;
     this.maxVelocity = 1000;
     this.maxReverseVelocity = 1000;
