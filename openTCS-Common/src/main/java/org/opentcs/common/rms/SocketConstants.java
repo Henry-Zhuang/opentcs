@@ -43,7 +43,7 @@ public class SocketConstants {
 
   public static final int ACK_TIMEOUT = 2;
 
-  public static final int HEARTBEAT_INTERVAL_MILLIS = 1000;
+  public static final int HEARTBEAT_INTERVAL_MILLIS = 300;
 
   public static final int RESEND_INTERVAL_MILLIS = 1000;
 }
