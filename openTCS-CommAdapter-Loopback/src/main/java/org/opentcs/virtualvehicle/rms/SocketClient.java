@@ -38,6 +38,8 @@ import static java.util.Objects.requireNonNull;
 import static org.opentcs.data.order.DriveOrder.Destination.OP_NOP;
 import static org.opentcs.util.Assertions.checkArgument;
 import static org.opentcs.util.Assertions.checkInRange;
+import static org.opentcs.util.Assertions.checkState;
+
 
 public class SocketClient implements EventHandler, Lifecycle {
   /**
@@ -308,6 +310,8 @@ public class SocketClient implements EventHandler, Lifecycle {
   }
 
   private void executePickPlaceJoint(Command cmd) {
+    // 校验机器人是否处于非充电状态
+    checkState(!vehicleModel.isChargerConnected(), "机器人处于充电状态，请先停止充电，再执行其他指令");
     // 参数校验
     List<Command.CommandParams.TargetID> targetIds
         = requireNonNull(cmd.getParams().getTargetID(), "targetIds");
@@ -327,6 +331,8 @@ public class SocketClient implements EventHandler, Lifecycle {
   }
 
   private void executeMove(Command cmd) {
+    // 校验机器人是否处于非充电状态
+    checkState(!vehicleModel.isChargerConnected(), "机器人处于充电状态，请先停止充电，再执行其他指令");
     // 参数校验
     List<Command.CommandParams.TargetID> targetIds
         = requireNonNull(cmd.getParams().getTargetID(), "targetIds");
@@ -361,18 +367,27 @@ public class SocketClient implements EventHandler, Lifecycle {
     // 创建指令记录，并执行指令
     List<DestinationCreationTO> destinations = new ArrayList<>(1);
     String destName = NameConvertor.toRechargeName(targetIds.get(0).getLocation());
-    String type = cmd.getParams().getCommand() == 1 ?
-        Command.Type.CHARGE.getType() : Command.Type.STOP_CHARGE.getType();
-    destinations.add(new DestinationCreationTO(destName, type));  // 终点
+    Command.Type type = cmd.getParams().getCommand() == 1 ? Command.Type.CHARGE : Command.Type.STOP_CHARGE;
+    if (cmd.getParams().getCommand() == 1)
+      checkState(!vehicleModel.isChargerConnected(), "机器人已处于充电状态，请勿重复下发充电指令");
+    else if (!vehicleModel.isChargerConnected()) {
+      sendResult(
+          cmd.getParams().getUniqueID(),
+          type,
+          Result.ErrorCode.SUCCEED.ordinal(),
+          Result.ErrorReason.NONE.getValue(),
+          null,
+          false);
+      return;
+    }
+    destinations.add(new DestinationCreationTO(destName, type.getType()));  // 终点
     TransportOrderCreationTO orderTO
         = new TransportOrderCreationTO(NameConvertor.toCommandName(cmd.getParams().getUniqueID()), destinations)
         .withIntendedVehicleName(getVehicleName())
-        .withType(type);
+        .withType(type.getType());
     orderService.createTransportOrder(orderTO);
-    if (type.equals(Command.Type.STOP_CHARGE.getType())
-        && vehicleModel.getVehicleState().equals(Vehicle.State.CHARGING)) {
+    if (type.equals(Command.Type.STOP_CHARGE) && vehicleModel.getVehicleState().equals(Vehicle.State.CHARGING))
       vehicleModel.setVehicleState(Vehicle.State.IDLE);
-    }
     dispatcherService.dispatch();
   }
 

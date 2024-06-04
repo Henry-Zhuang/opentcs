@@ -533,7 +533,7 @@ public class LoopbackCommunicationAdapter
           TimeUnit.MILLISECONDS);
     } else {
       getProcessModel().setChargerConnected(false);
-      getProcessModel().setVehicleState(Vehicle.State.CHARGING);
+      getProcessModel().setVehicleState(Vehicle.State.IDLE);
     }
   }
 
