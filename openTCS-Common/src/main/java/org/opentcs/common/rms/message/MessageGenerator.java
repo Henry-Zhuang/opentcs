@@ -35,6 +35,7 @@ public class MessageGenerator {
     params.setPosition(NameConvertor.toPointId(vehicleModel.getVehiclePosition()));
     double theta = vehicleModel.getVehicleOrientationAngle();
     if (!Double.isNaN(theta)) {
+      theta = Math.toRadians(theta - 90);
       params.setTheta(theta);
     }
     params.setOdo(10.0);

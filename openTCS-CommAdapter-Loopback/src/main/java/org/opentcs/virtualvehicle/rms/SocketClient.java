@@ -287,6 +287,7 @@ public class SocketClient implements EventHandler, Lifecycle {
       case PICK:
       case PLACE:
       case JOINT:
+      case JOINT_B:
         executePickPlaceJoint(cmd);
         break;
       case MOVE:
@@ -298,7 +299,8 @@ public class SocketClient implements EventHandler, Lifecycle {
       case CANCEL:
       case PAUSE:
       case CONTINUE:
-        executeCancelPauseContinue(cmd);
+      case LIFT:
+        executeCancelPauseContinueLift(cmd);
         break;
       default:
         LOG.warn("{}: Received unknown type command: {}", getVehicleName(), cmd);
@@ -310,9 +312,9 @@ public class SocketClient implements EventHandler, Lifecycle {
     List<Command.CommandParams.TargetID> targetIds
         = requireNonNull(cmd.getParams().getTargetID(), "targetIds");
     checkArgument(targetIds.size() == 1, "pick/place/joint targetIds size must be 1");
-
+    List<String> jointTypes = Arrays.asList(Command.Type.JOINT.getType(), Command.Type.JOINT_B.getType());
     // 创建指令记录，并执行指令
-    String destName = cmd.getType().equals(Command.Type.JOINT.getType()) ?
+    String destName = jointTypes.contains(cmd.getType()) ?
         NameConvertor.toStationName(targetIds.get(0).getLocation())
         : NameConvertor.toStackName(targetIds.get(0).getLocation(), cmd.getParams().getToteDirection());
     List<DestinationCreationTO> destinations = List.of(new DestinationCreationTO(destName, cmd.getType()));
@@ -374,8 +376,8 @@ public class SocketClient implements EventHandler, Lifecycle {
     dispatcherService.dispatch();
   }
 
-  private void executeCancelPauseContinue(Command cmd) {
-    // 创建指令记录，并执行指令
+  private void executeCancelPauseContinueLift(Command cmd) {
+    // 创建已完成的指令记录，并执行指令
     List<DestinationCreationTO> destinations
         = List.of(new DestinationCreationTO(
         vehicleModel.getVehiclePosition() != null ? vehicleModel.getVehiclePosition() : "",

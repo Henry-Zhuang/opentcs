@@ -2,6 +2,8 @@
 /build/
 /openTCS-*/build/
 *~
-
+/.idea/
+/.github/
+/.gitlab/
 # Ignore approval test result files.
 *Test*.received.txt

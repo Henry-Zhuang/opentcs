@@ -11,7 +11,7 @@ import com.google.inject.assistedinject.Assisted;
 
 import java.beans.PropertyChangeEvent;
 import java.util.Arrays;
-import java.util.Iterator;
+//import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 
@@ -26,6 +26,7 @@ import javax.inject.Inject;
 
 import org.opentcs.common.LoopbackAdapterConstants;
 import org.opentcs.common.rms.SocketConstants;
+import org.opentcs.common.rms.message.Command;
 import org.opentcs.components.kernel.services.DispatcherService;
 import org.opentcs.components.kernel.services.InternalTransportOrderService;
 import org.opentcs.components.kernel.services.InternalVehicleService;
@@ -84,6 +85,10 @@ public class LoopbackCommunicationAdapter
    */
   private static final int SIMULATION_TASKS_DELAY = 100;
   /**
+   * The time needed for executing joint operation.
+   */
+  private static final int JOINT_OPERATION_TIME = 3000;
+  /**
    * This instance's configuration.
    */
   private final VirtualVehicleConfiguration configuration;
@@ -102,6 +107,10 @@ public class LoopbackCommunicationAdapter
    * The vehicle's load state.
    */
   private LoadState loadState = LoadState.EMPTY;
+  /**
+   * The number of containers loaded by the vehicle.
+   */
+  private Integer loadedContainerNum = 0;
   /**
    * Whether the loopback adapter is initialized or not.
    */
@@ -283,26 +292,22 @@ public class LoopbackCommunicationAdapter
     // That would mean a vehicle moving to a parking position or recharging location would always
     // have to finish that order first, which would render a transport order's dispensable flag
     // useless.
-    boolean loaded = loadState == LoadState.FULL;
-    Iterator<String> opIter = operations.iterator();
-    while (canProcess && opIter.hasNext()) {
-      final String nextOp = opIter.next();
-      // If we're loaded, we cannot load another piece, but could unload.
-      if (loaded) {
-        if (nextOp.startsWith(getProcessModel().getLoadOperation())) {
-          canProcess = false;
-          reason = LOAD_OPERATION_CONFLICT;
-        } else if (nextOp.startsWith(getProcessModel().getUnloadOperation())) {
-          loaded = false;
-        }
-      } // If we're not loaded, we could load, but not unload.
-      else if (nextOp.startsWith(getProcessModel().getLoadOperation())) {
-        loaded = true;
-      } else if (nextOp.startsWith(getProcessModel().getUnloadOperation())) {
-        canProcess = false;
-        reason = UNLOAD_OPERATION_CONFLICT;
-      }
-    }
+//    Integer currLoadedNum = loadedContainerNum;
+//    Iterator<String> opIter = operations.iterator();
+//    while (canProcess && opIter.hasNext()) {
+//      final String nextOp = opIter.next();
+//      // 取箱则装载数加一，放箱则装载数减一；若装载数量变为负数，则说明不可执行，若装载数量超出机器人背篓容量，也说明不可执行.
+//      // 目前尚未增加机器人背篓容量的相关配置，暂时默认机器人背篓容量无上限；
+//      if (nextOp.startsWith(getProcessModel().getLoadOperation())) {
+//        currLoadedNum += 1;
+//      } else if (nextOp.startsWith(getProcessModel().getUnloadOperation())) {
+//        currLoadedNum -= 1;
+//      }
+//      if (currLoadedNum < 0) {
+//        canProcess = false;
+//        reason = UNLOAD_OPERATION_CONFLICT;
+//      }
+//    }
     if (!canProcess) {
       LOG.debug("{}: Cannot process {}, reason: '{}'", getName(), operations, reason);
     }
@@ -435,6 +440,9 @@ public class LoopbackCommunicationAdapter
       rechargeSimulation(command);
     else if (command.getOperation().equals(getStopRechargeOperation()))
       stopRechargeSimulation(command);
+    else if (command.getOperation().equals(Command.Type.JOINT.getType())
+        || command.getOperation().equals(Command.Type.JOINT_B.getType()))
+      jointOperationSimulation(command);
     else
       loadUnloadOperationSimulation(command);
   }
@@ -453,6 +461,32 @@ public class LoopbackCommunicationAdapter
     finishVehicleSimulation(command);
   }
 
+  private void jointOperationSimulation(MovementCommand command) {
+    operationSimulationTimePassed += getSimulationTimeStep();
+
+    if (operationSimulationTimePassed < JOINT_OPERATION_TIME) {
+      getProcessModel().getVelocityController().advanceTime(getSimulationTimeStep());
+      energyConsumeSimulation(getSimulationTimeStep());  // 模拟电量消耗
+      ((ScheduledExecutorService) getExecutor()).schedule(() -> operationSimulation(command),
+          SIMULATION_TASKS_DELAY,
+          TimeUnit.MILLISECONDS);
+    } else {
+      LOG.debug("Joint operation simulation finished.");
+//      if (loadedContainerNum > 0) {
+//        loadedContainerNum = 0;
+//        getProcessModel().setVehicleLoadHandlingDevices(
+//            Arrays.asList(new LoadHandlingDevice(LHD_NAME, false))
+//        );
+//      } else {
+//        loadedContainerNum = 8;
+//        getProcessModel().setVehicleLoadHandlingDevices(
+//            Arrays.asList(new LoadHandlingDevice(LHD_NAME, true))
+//        );
+//      }
+      finishVehicleSimulation(command);
+    }
+  }
+
   private void loadUnloadOperationSimulation(MovementCommand command) {
     operationSimulationTimePassed += getSimulationTimeStep();
 
@@ -464,17 +498,23 @@ public class LoopbackCommunicationAdapter
           TimeUnit.MILLISECONDS);
     } else {
       LOG.debug("Operation simulation finished.");
-      String operation = command.getOperation();
-      if (operation.equals(getProcessModel().getLoadOperation())) {
-        // Update load handling devices as defined by this operation
-        getProcessModel().setVehicleLoadHandlingDevices(
-            Arrays.asList(new LoadHandlingDevice(LHD_NAME, true))
-        );
-      } else if (operation.equals(getProcessModel().getUnloadOperation())) {
-        getProcessModel().setVehicleLoadHandlingDevices(
-            Arrays.asList(new LoadHandlingDevice(LHD_NAME, false))
-        );
-      }
+//      String operation = command.getOperation();
+//      if (operation.equals(getProcessModel().getLoadOperation())) {
+//        // 增加装载的料箱数量
+//        loadedContainerNum += 1;
+//        if (loadedContainerNum == 1)
+//          // Update load handling devices as defined by this operation
+//          getProcessModel().setVehicleLoadHandlingDevices(
+//              Arrays.asList(new LoadHandlingDevice(LHD_NAME, true))
+//          );
+//      } else if (operation.equals(getProcessModel().getUnloadOperation())) {
+//        // 减少装载的料箱数量
+//        loadedContainerNum -= 1;
+//        if (loadedContainerNum == 0)
+//          getProcessModel().setVehicleLoadHandlingDevices(
+//              Arrays.asList(new LoadHandlingDevice(LHD_NAME, false))
+//          );
+//      }
       finishVehicleSimulation(command);
     }
   }
