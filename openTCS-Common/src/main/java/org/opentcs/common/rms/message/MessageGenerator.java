@@ -26,12 +26,13 @@ public class MessageGenerator {
   }
 
 
-  public static Heartbeat generateHeartbeat(@NonNull VehicleProcessModel vehicleModel) {
+  public static Heartbeat generateHeartbeat(@NonNull VehicleProcessModel vehicleModel, Boolean isMoving) {
     Heartbeat.HeartbeatParams params = new Heartbeat.HeartbeatParams();
 
     params.setRobotID(NameConvertor.toRobotId(vehicleModel.getName()));
     params.setUniqueID(vehicleModel.getUniqueId());
-    params.setStatus(0);
+    Integer status = isMoving ? 1 : 0;
+    params.setStatus(status);
     params.setPosition(NameConvertor.toPointId(vehicleModel.getVehiclePosition()));
     double theta = vehicleModel.getVehicleOrientationAngle();
     if (!Double.isNaN(theta)) {

@@ -104,7 +104,10 @@ public class VehicleProcessModel {
    * The uniqueId of vehicle's current command.
    */
   private volatile UnsignedLong uniqueId;
-
+  /**
+   * Indicates whether this virtual vehicle is moving or not.
+   */
+  private volatile boolean moving = false;
   /**
    * Creates a new instance.
    *
@@ -457,6 +460,14 @@ public class VehicleProcessModel {
 
   public synchronized void setUniqueId(UnsignedLong uniqueId) {
     this.uniqueId = uniqueId;
+  }
+
+  public synchronized boolean isMoving() {
+    return moving;
+  }
+
+  public synchronized void setMoving(boolean moving) {
+    this.moving = moving;
   }
 
   /**

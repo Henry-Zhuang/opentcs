@@ -371,7 +371,7 @@ public class LoopbackCommunicationAdapter
               step.getDestinationPoint().getName(),
               step.getVehicleOrientation())
       );
-
+      getProcessModel().setMoving(true);
       LOG.debug("Starting movement simulation...");
       ((ScheduledExecutorService) getExecutor()).schedule(() -> movementSimulation(command),
           SIMULATION_TASKS_DELAY,
@@ -553,6 +553,7 @@ public class LoopbackCommunicationAdapter
         && !command.getOperation().equals(getRechargeOperation())
     ) {
       getProcessModel().setVehicleState(Vehicle.State.IDLE);
+      getProcessModel().setMoving(false);
     }
     if (Objects.equals(getSentQueue().peek(), command)) {
       // Let the comm adapter know we have finished this command.

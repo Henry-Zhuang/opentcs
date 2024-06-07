@@ -466,7 +466,7 @@ public class SocketClient implements EventHandler, Lifecycle {
   }
 
   public boolean sendHeartbeat() {
-    return send(MessageGenerator.generateHeartbeat(vehicleModel), false);
+    return send(MessageGenerator.generateHeartbeat(vehicleModel, vehicleModel.isMoving()), false);
   }
 
   public boolean sendAck(@NonNull Response ack) {
