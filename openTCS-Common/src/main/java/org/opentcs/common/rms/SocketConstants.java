@@ -19,9 +19,11 @@ public class SocketConstants {
 
   public static final int PACKET_HEADER_LEN = 47;
 
-  public static final String PROPERTY_KEY_SERVER_IP = "socket:serverIp";
+  public static final String PROPERTY_KEY_SERVER_IP = "socket:rmsServerIp";
 
-  public static final String PROPERTY_KEY_SERVER_PORT = "socket:serverPort";
+  public static final String PROPERTY_KEY_SERVER_PORT = "socket:rmsServerPort";
+
+  public static final String PROPERTY_KEY_ROBOT_TYPE = "socket:robotType";
 
   public static final String DEFAULT_SERVER_IP = "127.0.0.1";
 

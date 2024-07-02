@@ -2,6 +2,9 @@ package org.opentcs.common.rms.message;
 
 import com.google.common.primitives.UnsignedLong;
 import org.opentcs.common.rms.NameConvertor;
+import org.opentcs.common.rms.robot.MTBStatus;
+import org.opentcs.common.rms.robot.MTDStatus;
+import org.opentcs.common.rms.robot.RobotType;
 import org.opentcs.drivers.vehicle.VehicleProcessModel;
 
 import lombok.NonNull;
@@ -10,9 +13,12 @@ import java.util.Objects;
 import java.util.UUID;
 
 public class MessageGenerator {
-  public static void packMsg(@NonNull Message msg, @NonNull Command.Type type, boolean needAck) {
+  public static void packMsg(@NonNull Message msg,
+                             @NonNull Command.Type type,
+                             @NonNull Integer robotTypeValue,
+                             boolean needAck) {
     // 添加消息公共部分
-    msg.setDeviceType(1);
+    msg.setDeviceType(robotTypeValue);
     msg.setChannel(type.getChannel());
     if (type.equals(Command.Type.STOP_CHARGE))
       msg.setType(Command.Type.CHARGE.getType());
@@ -26,12 +32,19 @@ public class MessageGenerator {
   }
 
 
-  public static Heartbeat generateHeartbeat(@NonNull VehicleProcessModel vehicleModel, Boolean isMoving) {
+  public static Heartbeat generateHeartbeat(@NonNull VehicleProcessModel vehicleModel,
+                                            @NonNull RobotType robotType,
+                                            Boolean isMoving) {
     Heartbeat.HeartbeatParams params = new Heartbeat.HeartbeatParams();
 
     params.setRobotID(NameConvertor.toRobotId(vehicleModel.getName()));
     params.setUniqueID(vehicleModel.getUniqueId());
-    Integer status = isMoving ? 1 : 0;
+    int status;
+    if (robotType.equals(RobotType.MT_D)){
+      status = isMoving ? MTDStatus.MOVING.getValue(): MTDStatus.IDLE.getValue();
+    } else {
+      status = isMoving ? MTBStatus.MOVING.getValue() : MTBStatus.IDLE.getValue();
+    }
     params.setStatus(status);
     params.setPosition(NameConvertor.toPointId(vehicleModel.getVehiclePosition()));
     double theta = vehicleModel.getVehicleOrientationAngle();
@@ -49,18 +62,18 @@ public class MessageGenerator {
 
     Heartbeat hb = new Heartbeat();
     hb.setParams(params);
-    packMsg(hb, Command.Type.HEARTBEAT, false);
+    packMsg(hb, Command.Type.HEARTBEAT, robotType.getValue(), false);
     return hb;
   }
 
-  public static Response generateAck(@NonNull Message msg) {
+  public static Response generateAck(@NonNull Message msg, @NonNull RobotType robotType) {
     Message.Params params = new Message.Params();
     params.setRobotID(msg.getParams().getRobotID());
     params.setUniqueID(msg.getParams().getUniqueID());
     Response ack = new Response();
     ack.setParams(params);
     Command.Type type = Command.Type.fromString(Objects.requireNonNull(msg.getType(), "type"));
-    packMsg(ack, type, false);
+    packMsg(ack, type, robotType.getValue(), false);
     return ack;
   }
 
@@ -70,6 +83,7 @@ public class MessageGenerator {
                                       @NonNull Integer errorCode,
                                       @NonNull Integer errorReason,
                                       String actualBarcode,
+                                      @NonNull RobotType robotType,
                                       boolean needAck) {
     Result.ResultParams params = new Result.ResultParams();
     params.setRobotID(robotID);
@@ -81,7 +95,7 @@ public class MessageGenerator {
 
     Result result = new Result();
     result.setParams(params);
-    packMsg(result, type, needAck);
+    packMsg(result, type, robotType.getValue(), needAck);
     return result;
   }
 }

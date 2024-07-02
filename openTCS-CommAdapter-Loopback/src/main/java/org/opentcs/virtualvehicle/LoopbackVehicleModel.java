@@ -10,6 +10,8 @@ package org.opentcs.virtualvehicle;
 import javax.annotation.Nonnull;
 
 import org.opentcs.common.LoopbackAdapterConstants;
+import org.opentcs.common.rms.robot.RobotType;
+import org.opentcs.common.rms.SocketConstants;
 import org.opentcs.data.model.Vehicle;
 import org.opentcs.drivers.vehicle.VehicleProcessModel;
 
@@ -20,6 +22,10 @@ public class LoopbackVehicleModel
     extends VehicleProcessModel
     implements VelocityListener {
 
+  /**
+   * The robot type of the vehicle (including MT_B, MT_Z and MT_D).
+   */
+  private RobotType robotType;
   /**
    * Indicates whether this communication adapter is in single step mode or not (i.e. in automatic
    * mode).
@@ -70,6 +76,7 @@ public class LoopbackVehicleModel
     this.fullRunningTime = 4 * this.fullRechargingTime;
     this.loadOperation = extractLoadOperation(attachedVehicle);
     this.unloadOperation = extractUnloadOperation(attachedVehicle);
+    this.robotType = extractRobotType(attachedVehicle);
   }
 
   public String getLoadOperation() {
@@ -78,6 +85,10 @@ public class LoopbackVehicleModel
 
   public String getUnloadOperation() {
     return this.unloadOperation;
+  }
+
+  public RobotType getRobotType() {
+    return this.robotType;
   }
 
   /**
@@ -375,6 +386,14 @@ public class LoopbackVehicleModel
     if (result == null) {
       result = LoopbackAdapterConstants.PROPVAL_UNLOAD_OPERATION_DEFAULT;
     }
+    return result;
+  }
+
+  private static RobotType extractRobotType(Vehicle attachedVehicle) {
+    String type = attachedVehicle.getProperty(SocketConstants.PROPERTY_KEY_ROBOT_TYPE);
+    RobotType result = RobotType.findByName(type);
+    if (result == null)
+      return RobotType.MT_B;
     return result;
   }
 

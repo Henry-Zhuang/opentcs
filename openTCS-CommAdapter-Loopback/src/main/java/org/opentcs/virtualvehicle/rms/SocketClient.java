@@ -11,6 +11,7 @@ import lombok.NonNull;
 import org.opentcs.access.to.order.DestinationCreationTO;
 import org.opentcs.access.to.order.TransportOrderCreationTO;
 import org.opentcs.common.rms.NameConvertor;
+import org.opentcs.common.rms.robot.RobotType;
 import org.opentcs.common.rms.SocketConstants;
 import org.opentcs.common.rms.message.*;
 import org.opentcs.components.Lifecycle;
@@ -186,6 +187,10 @@ public class SocketClient implements EventHandler, Lifecycle {
     return vehicleModel.getName();
   }
 
+  public RobotType getRobotType() {
+    return vehicleModel.getRobotType();
+  }
+
   public void scanResendTable() {
     try {
       Iterator<Map.Entry<UnsignedLong, MessageWrapper>> it = resendTable.entrySet().iterator();
@@ -317,6 +322,9 @@ public class SocketClient implements EventHandler, Lifecycle {
         = requireNonNull(cmd.getParams().getTargetID(), "targetIds");
     checkArgument(targetIds.size() == 1, "pick/place/joint targetIds size must be 1");
     List<String> jointTypes = Arrays.asList(Command.Type.JOINT.getType(), Command.Type.JOINT_B.getType());
+    if (!jointTypes.contains(cmd.getType()) && getRobotType().equals(RobotType.MT_D)){
+      MTDPickPlaceRules.validate(cmd);  // 校验MT_D取放箱特殊情况
+    }
     // 创建指令记录，并执行指令
     String destName = jointTypes.contains(cmd.getType()) ?
         NameConvertor.toStationName(targetIds.get(0).getLocation())
@@ -466,7 +474,14 @@ public class SocketClient implements EventHandler, Lifecycle {
   }
 
   public boolean sendHeartbeat() {
-    return send(MessageGenerator.generateHeartbeat(vehicleModel, vehicleModel.isMoving()), false);
+    return send(
+        MessageGenerator.generateHeartbeat(
+            vehicleModel,
+            getRobotType(),
+            vehicleModel.isMoving()
+        ),
+        false
+    );
   }
 
   public boolean sendAck(@NonNull Response ack) {
@@ -486,6 +501,7 @@ public class SocketClient implements EventHandler, Lifecycle {
         errorCode,
         errorReason,
         actualBarcode,
+        getRobotType(),
         isNotInstantCommand(type.getType())
     );
     return send(result, await);

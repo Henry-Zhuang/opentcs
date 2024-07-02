@@ -5,6 +5,8 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
+import java.util.List;
+
 @Data
 @ToString(callSuper = true)
 @EqualsAndHashCode(callSuper = true)
@@ -17,6 +19,7 @@ public class Heartbeat extends Message {
     @EqualsAndHashCode(callSuper = true)
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class HeartbeatParams extends Params {
+        private List<Integer> errors;
         private Integer status;
         private Integer position;
         private Double theta;

@@ -64,7 +64,7 @@ public class SocketClientHandler extends SimpleChannelInboundHandler<Message> {
       else { // 收到指令信息
         if (SocketClient.isNotInstantCommand(msg.getType()))
           // 非即时指令需要向RMS发送指令应答
-          socketClient.sendAck(MessageGenerator.generateAck(msg));
+          socketClient.sendAck(MessageGenerator.generateAck(msg, socketClient.getRobotType()));
         socketClient.processReceivedCommand(msg);
       }
     } catch (Throwable e) {

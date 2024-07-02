@@ -9,7 +9,9 @@ package org.opentcs.operationsdesk;
 
 import java.util.HashSet;
 import java.util.Set;
+
 import org.opentcs.common.LoopbackAdapterConstants;
+import org.opentcs.common.rms.robot.RobotType;
 import org.opentcs.common.rms.SocketConstants;
 import org.opentcs.components.kernel.Dispatcher;
 import org.opentcs.components.kernel.Router;
@@ -45,6 +47,7 @@ public class DefaultPropertySuggestions
     keySuggestions.add(LoopbackAdapterConstants.PROPKEY_DECELERATION);
     keySuggestions.add(SocketConstants.PROPERTY_KEY_SERVER_PORT);
     keySuggestions.add(SocketConstants.PROPERTY_KEY_SERVER_IP);
+    keySuggestions.add(SocketConstants.PROPERTY_KEY_ROBOT_TYPE);
   }
 
   @Override
@@ -57,4 +60,10 @@ public class DefaultPropertySuggestions
     return valueSuggestions;
   }
 
+  @Override
+  public Set<String> getValueSuggestionsFor(String key) {
+    if (key.equals(SocketConstants.PROPERTY_KEY_ROBOT_TYPE))
+      return RobotType.names();
+    return new HashSet<>();
+  }
 }
