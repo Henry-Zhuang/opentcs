@@ -87,4 +87,10 @@ public interface VirtualVehicleConfiguration {
       description = {"The socket server port that the virtual vehicle will connect to."},
       orderKey = "3_socket_2")
   String socketServerPort();
+
+  @ConfigurationEntry(
+      type = "Boolean",
+      description = "Whether the warehouse lane follows the y-axis.",
+      orderKey = "4_is_lane_y")
+  boolean isLaneY();
 }

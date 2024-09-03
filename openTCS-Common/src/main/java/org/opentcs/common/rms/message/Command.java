@@ -41,6 +41,10 @@ public class Command extends Message {
      */
     private Double upperWeight;
     /**
+     * 取放箱指令参数, 该操作是否为单箱操作
+     */
+    private Integer isSingle;
+    /**
      * 充电选项, <code>1</code>-充电; <code>2</code>-打断充电
      */
     private Short command;

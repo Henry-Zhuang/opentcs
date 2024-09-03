@@ -31,7 +31,8 @@ public class SocketClientTest {
         mock(DispatcherService.class),
         mock(InternalVehicleService.class),
         SocketConstants.DEFAULT_SERVER_IP,
-        String.valueOf(SocketConstants.DEFAULT_SERVER_PORT)
+        String.valueOf(SocketConstants.DEFAULT_SERVER_PORT),
+        false
     );
     client.enable();
     while (run) ;

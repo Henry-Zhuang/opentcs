@@ -1,8 +1,10 @@
 package org.opentcs.virtualvehicle.rms;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
@@ -13,6 +15,8 @@ import io.netty.handler.codec.MessageToByteEncoder;
 import io.netty.util.CharsetUtil;
 import lombok.NonNull;
 import org.opentcs.common.rms.message.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.ByteOrder;
 import java.util.HashMap;
@@ -26,6 +30,7 @@ class SocketClientInitializer extends ChannelInitializer<SocketChannel> {
   private static final ObjectMapper objectMapper = new ObjectMapper();
   private final SocketClient socketClient;
   private final ScheduledThreadPoolExecutor scheduledTimer;
+
   public SocketClientInitializer(@NonNull SocketClient socketClient,
                                  @NonNull ScheduledThreadPoolExecutor scheduledTimer) {
     this.socketClient = requireNonNull(socketClient, "socketClient");
@@ -111,32 +116,48 @@ class SocketClientInitializer extends ChannelInitializer<SocketChannel> {
   }
 
   private static class ClientMessageDecoder extends ByteToMessageDecoder {
+
+    public static final Logger LOG = LoggerFactory.getLogger(ClientMessageDecoder.class);
+
     @Override
     protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Exception {
       // 报文序号字段
-      ByteBuf seqBuf = in.readBytes(32);  // 注意：readBytes会新生成一个ByteBuf，使用后需释放掉，否则会造成内存泄露
-      String msgSeq = seqBuf.toString(CharsetUtil.UTF_8);
-      seqBuf.release();
+      String msgSeq = readString(in, 32);
       // 报文类型
       byte msgMode = in.readByte();
       // 报文数据区长度
       int msgLen = in.readIntLE();
       // CRC校验字段
-      ByteBuf crcBuf = in.readBytes(2);
-      byte[] crc = ByteBufUtil.getBytes(crcBuf);
-      crcBuf.release();
+      byte[] crc = readBytes(in, 2);
       // 保留字段
-      ByteBuf reservedBuf = in.readBytes(2);
-      byte[] reserved = ByteBufUtil.getBytes(reservedBuf);
-      reservedBuf.release();
+      byte[] reserved = readBytes(in, 2);
       Message.Header header = new Message.Header(msgSeq, msgMode, msgLen, crc, reserved);
       // 报文数据区内容
-      ByteBuf dataBuf = in.readBytes(in.readableBytes());
-      String dataStr = dataBuf.toString(CharsetUtil.UTF_8);
-      dataBuf.release();
-      Message msg = JsonToData(dataStr, msgMode);
-      msg.setHeader(header);
-      out.add(msg);
+      String dataStr = readString(in, in.readableBytes());
+      try {
+        Message msg = JsonToData(dataStr, msgMode);
+        if (msg == null) {
+          throw new Exception("JsonToData returned null");
+        }
+        msg.setHeader(header);
+        out.add(msg);
+      } catch (Exception e) {
+        LOG.error("Parse message data error：Data={}, Header={}\nError={}", dataStr, header, e.getMessage());
+      }
+    }
+
+    private String readString(ByteBuf in, int length) {
+      ByteBuf buf = in.readBytes(length);
+      String str = buf.toString(CharsetUtil.UTF_8);
+      buf.release();
+      return str;
+    }
+
+    private byte[] readBytes(ByteBuf in, int length) {
+      ByteBuf buf = in.readBytes(length);
+      byte[] bytes = ByteBufUtil.getBytes(buf);
+      buf.release();
+      return bytes;
     }
 
     private Message JsonToData(String dataStr, byte msgMode) throws Exception {

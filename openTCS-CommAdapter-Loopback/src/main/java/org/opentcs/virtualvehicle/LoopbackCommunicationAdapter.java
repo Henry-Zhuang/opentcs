@@ -157,7 +157,8 @@ public class LoopbackCommunicationAdapter
         dispatcherService,
         vehicleService,
         serverIp != null ? serverIp : configuration.socketServerIp(),
-        serverPort != null ? serverPort : configuration.socketServerPort()
+        serverPort != null ? serverPort : configuration.socketServerPort(),
+        configuration.isLaneY()
     );
     this.vehicleService = requireNonNull(vehicleService);
   }

@@ -953,12 +953,14 @@ public class DefaultVehicleController
 
       // Free resources allocated for executed commands, but keep as many as needed for the
       // vehicle's current length.
-      int freeableResourceSetCount
-          = ResourceMath.freeableResourceSetCount(
-              SplitResources.from(allocatedResources, toResourceSet(lastCommandExecuted.getStep()))
-                  .getResourcesPassed(),
-              commAdapter.getProcessModel().getVehicleLength()
-          );
+//      int freeableResourceSetCount
+//          = ResourceMath.freeableResourceSetCount(
+//              SplitResources.from(allocatedResources, toResourceSet(lastCommandExecuted.getStep()))
+//                  .getResourcesPassed(),
+//              commAdapter.getProcessModel().getVehicleLength()
+//          );
+      int freeableResourceSetCount = SplitResources.from(
+          allocatedResources, toResourceSet(lastCommandExecuted.getStep())).getResourcesPassed().size() - 1;
       for (int i = 0; i < freeableResourceSetCount; i++) {
         Set<TCSResource<?>> oldResources = allocatedResources.poll();
         LOG.debug("{}: Freeing resources: {}", vehicle.getName(), oldResources);
@@ -1113,9 +1115,9 @@ public class DefaultVehicleController
 
     Set<TCSResource<?>> result = new HashSet<>();
     result.add(cmd.getStep().getDestinationPoint());
-    if (cmd.getStep().getPath() != null) {
-      result.add(cmd.getStep().getPath());
-    }
+//    if (cmd.getStep().getPath() != null) {
+//      result.add(cmd.getStep().getPath());
+//    }
     return result;
   }
 
@@ -1369,9 +1371,10 @@ public class DefaultVehicleController
   }
 
   private Set<TCSResource<?>> toResourceSet(Step step) {
-    return step.getPath() != null
-        ? Set.of(step.getDestinationPoint(), step.getPath())
-        : Set.of(step.getDestinationPoint());
+//    return step.getPath() != null
+//        ? Set.of(step.getDestinationPoint(), step.getPath())
+//        : Set.of(step.getDestinationPoint());
+    return Set.of(step.getDestinationPoint());
   }
 
   private boolean isForcedRerouting(DriveOrder newOrder) {

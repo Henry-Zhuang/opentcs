@@ -10,7 +10,7 @@ charset = utf-8
 # Use spaces instead of tabs
 indent_style = space
 # 4 space indentation by default
-indent_size = 4
+indent_size = 2
 # 4 space continuation indentation (might not be supported for all file types/domains)
 continuation_indent_size = 4
 # Use Unix-style newlines

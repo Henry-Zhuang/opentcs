@@ -59,6 +59,8 @@ public class SocketClientHandler extends SimpleChannelInboundHandler<Message> {
   @Override
   protected void channelRead0(ChannelHandlerContext ctx, Message msg) {
     try {
+      if (msg == null)
+        return;
       if (msg.getHeader().getMsgMode() == 0)   // 收到应答信息
         socketClient.processReceivedAck(msg);
       else { // 收到指令信息

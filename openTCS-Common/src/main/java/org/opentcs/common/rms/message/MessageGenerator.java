@@ -34,7 +34,8 @@ public class MessageGenerator {
 
   public static Heartbeat generateHeartbeat(@NonNull VehicleProcessModel vehicleModel,
                                             @NonNull RobotType robotType,
-                                            Boolean isMoving) {
+                                            Boolean isMoving,
+                                            Boolean isLaneY) {
     Heartbeat.HeartbeatParams params = new Heartbeat.HeartbeatParams();
 
     params.setRobotID(NameConvertor.toRobotId(vehicleModel.getName()));
@@ -49,7 +50,9 @@ public class MessageGenerator {
     params.setPosition(NameConvertor.toPointId(vehicleModel.getVehiclePosition()));
     double theta = vehicleModel.getVehicleOrientationAngle();
     if (!Double.isNaN(theta)) {
-      theta = Math.toRadians(theta - 90);
+      if (isLaneY)
+        theta = theta - 90;
+      theta = Math.toRadians(theta);
       params.setTheta(theta);
     }
     params.setOdo(10.0);

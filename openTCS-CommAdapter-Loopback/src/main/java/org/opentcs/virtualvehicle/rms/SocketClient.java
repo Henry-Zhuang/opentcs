@@ -54,6 +54,7 @@ public class SocketClient implements EventHandler, Lifecycle {
   private final LoopbackVehicleModel vehicleModel;
   private final String serverHost;
   private final int serverPort;
+  private final boolean isLaneY;
   private ScheduledThreadPoolExecutor scheduledTimer;
   private EventLoopGroup workerGroup;
   private Bootstrap bootstrap;
@@ -68,7 +69,8 @@ public class SocketClient implements EventHandler, Lifecycle {
                       @NonNull DispatcherService dispatcherService,
                       @NonNull InternalVehicleService vehicleService,
                       String serverHost,
-                      String serverPort) {
+                      String serverPort,
+                      Boolean isLaneY) {
     this.vehicleModel = vehicleModel;
     this.eventSource = eventSource;
     this.orderService = orderService;
@@ -78,6 +80,7 @@ public class SocketClient implements EventHandler, Lifecycle {
     this.serverPort = serverPort != null ?
         checkInRange(Integer.parseInt(serverPort), 1, 65535, "serverPort")
         : SocketConstants.DEFAULT_SERVER_PORT;
+    this.isLaneY = isLaneY != null ? isLaneY : false;
   }
 
   @Override
@@ -166,7 +169,7 @@ public class SocketClient implements EventHandler, Lifecycle {
         LOG.info("{}: Connected to RMS tcp server({}:{})", getVehicleName(), serverHost, serverPort);
         channel = cf.channel();
       } else if (isEnabled()) {
-        LOG.info("{}: Reconnecting to RMS tcp server({}:{})......", getVehicleName(), serverHost, serverPort);
+        LOG.debug("{}: Reconnecting to RMS tcp server({}:{})......", getVehicleName(), serverHost, serverPort);
         workerGroup.schedule(this::connect, getReconnectDelayTime(), TimeUnit.SECONDS);
       }
     } catch (InterruptedException ex) {
@@ -478,7 +481,8 @@ public class SocketClient implements EventHandler, Lifecycle {
         MessageGenerator.generateHeartbeat(
             vehicleModel,
             getRobotType(),
-            vehicleModel.isMoving()
+            vehicleModel.isMoving(),
+            isLaneY
         ),
         false
     );
