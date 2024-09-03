@@ -324,12 +324,11 @@ public class SocketClient implements EventHandler, Lifecycle {
     List<Command.CommandParams.TargetID> targetIds
         = requireNonNull(cmd.getParams().getTargetID(), "targetIds");
     checkArgument(targetIds.size() == 1, "pick/place/joint targetIds size must be 1");
-    List<String> jointTypes = Arrays.asList(Command.Type.JOINT.getType(), Command.Type.JOINT_B.getType());
-    if (!jointTypes.contains(cmd.getType()) && getRobotType().equals(RobotType.MT_D)){
+    if (!isJointCommand(cmd) && getRobotType().equals(RobotType.MT_D)){
       MTDPickPlaceRules.validate(cmd);  // 校验MT_D取放箱特殊情况
     }
     // 创建指令记录，并执行指令
-    String destName = jointTypes.contains(cmd.getType()) ?
+    String destName = isJointCommand(cmd) ?
         NameConvertor.toStationName(targetIds.get(0).getLocation())
         : NameConvertor.toStackName(targetIds.get(0).getLocation(), cmd.getParams().getToteDirection());
     List<DestinationCreationTO> destinations = List.of(new DestinationCreationTO(destName, cmd.getType()));
@@ -339,6 +338,11 @@ public class SocketClient implements EventHandler, Lifecycle {
         .withType(cmd.getType());
     orderService.createTransportOrder(orderTO);
     dispatcherService.dispatch();
+  }
+
+  private boolean isJointCommand(Command cmd) {
+    List<String> jointTypes = Arrays.asList(Command.Type.JOINT.getType(), Command.Type.JOINT_B.getType());
+    return jointTypes.contains(cmd.getType()) || cmd.getParams().getToteZ() > 50;
   }
 
   private void executeMove(Command cmd) {
