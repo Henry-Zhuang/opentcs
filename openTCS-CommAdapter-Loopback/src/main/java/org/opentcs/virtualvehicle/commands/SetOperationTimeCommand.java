@@ -7,34 +7,32 @@
  */
 package org.opentcs.virtualvehicle.commands;
 
-import javax.annotation.Nullable;
 import org.opentcs.drivers.vehicle.AdapterCommand;
-import org.opentcs.drivers.vehicle.SimVehicleCommAdapter;
 import org.opentcs.drivers.vehicle.VehicleCommAdapter;
+import org.opentcs.virtualvehicle.LoopbackCommunicationAdapter;
 
 /**
- * A command to set a vehicle's position.
+ * A command to set a vehicle's maximum reverse velocity.
  */
-public class SetPositionCommand
+public class SetOperationTimeCommand
     implements AdapterCommand {
 
   /**
-   * The position to set.
+   * The operation time to set.
    */
-  private final String position;
+  private final int opTime;
 
   /**
    * Creates a new instance.
    *
-   * @param position The position to set.
+   * @param opTime The operation time to set.
    */
-  public SetPositionCommand(@Nullable String position) {
-    this.position = position;
+  public SetOperationTimeCommand(int opTime) {
+    this.opTime = opTime;
   }
 
   @Override
   public void execute(VehicleCommAdapter adapter) {
-    ((SimVehicleCommAdapter) adapter).initVehiclePosition(position);
-//    adapter.getProcessModel().setVehiclePosition(position);
+    ((LoopbackCommunicationAdapter) adapter).getProcessModel().setOperatingTime(opTime);
   }
 }

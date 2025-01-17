@@ -76,9 +76,11 @@ public class IsAvailableForAnyOrder
   }
 
   private boolean rechargeThresholdReached(Vehicle vehicle) {
-    return configuration.keepRechargingUntilFullyCharged()
-        ? vehicle.isEnergyLevelFullyRecharged()
-        : vehicle.isEnergyLevelSufficientlyRecharged();
+    // 此处暂时修改为：若配置文件未配置需要充至满电才可执行指令，则指令分配时不考虑机器人的电量
+    return !configuration.keepRechargingUntilFullyCharged() || vehicle.isEnergyLevelFullyRecharged();
+//    return configuration.keepRechargingUntilFullyCharged()
+//        ? vehicle.isEnergyLevelFullyRecharged()
+//        : vehicle.isEnergyLevelSufficientlyRecharged();
   }
 
   private boolean processesNoOrder(Vehicle vehicle) {

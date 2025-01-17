@@ -26,7 +26,7 @@ public class Result extends Message {
 
     public enum ErrorReason {
       NONE(0),
-      OTHER_REASON(100);
+      OTHER_REASON(999);
 
       private final int value;
       ErrorReason(int value) {

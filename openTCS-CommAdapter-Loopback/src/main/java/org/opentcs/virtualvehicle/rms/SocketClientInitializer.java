@@ -87,6 +87,10 @@ class SocketClientInitializer extends ChannelInitializer<SocketChannel> {
         params.put("uniqueID", msg.getParams().getUniqueID());
       if (msg instanceof Heartbeat) {
         Heartbeat hb = (Heartbeat) msg;
+        if (hb.getParams().getErrors() != null)
+          params.put("errors", hb.getParams().getErrors());
+        if (hb.getParams().getMode() != null)
+          params.put("mode", hb.getParams().getMode());
         if (hb.getParams().getStatus() != null)
           params.put("status", hb.getParams().getStatus());
         if (hb.getParams().getPosition() != null)

@@ -124,6 +124,11 @@ public class Route
      */
     private final Vehicle.Orientation vehicleOrientation;
     /**
+     * 执行此路段的车辆的车头朝向角度（角度制）.
+     * 根据起点、终点坐标以及是否反走来计算车头朝向；如果起始点为空，则车头朝向角度为NaN.
+     */
+    private final double vehicleDirection;
+    /**
      * This step's index in the vehicle's route.
      */
     private final int routeIndex;
@@ -164,6 +169,7 @@ public class Route
       this.routeIndex = routeIndex;
       this.executionAllowed = executionAllowed;
       this.reroutingType = reroutingType;
+      this.vehicleDirection = (srcPoint == null)? Double.NaN : calculateVehicleDirection(srcPoint, destPoint, orientation);
     }
 
     /**
@@ -245,6 +251,16 @@ public class Route
     }
 
     /**
+     * 返回执行此路段的车辆的车头朝向角度（角度制）.
+     * 根据起点、终点坐标以及是否反走来计算车头朝向；如果起始点为空，则车头朝向角度为NaN.
+     *
+     * @return 执行此路段的车辆的车头朝向角度（角度制）.
+     */
+    public double getVehicleDirection() {
+      return vehicleDirection;
+    }
+
+    /**
      * Returns this step's index in the vehicle's route.
      *
      * @return This step's index in the vehicle's route.
@@ -301,6 +317,31 @@ public class Route
     @Override
     public String toString() {
       return destinationPoint.getName();
+    }
+
+    /**
+     * 计算两点间的路段要求的车辆方向角
+     *
+     * @param sourcePoint 起始
+     * @param destPoint 目标
+     * @param orientation 路段方向，正走或倒走
+     * @return 车辆方向角，范围[-180°, 180°)
+     */
+    public static double calculateVehicleDirection(Point sourcePoint, Point destPoint, Vehicle.Orientation orientation) {
+      // 根据起始点与终点的坐标计算车头朝向角度（角度制）
+      double angle = Math.toDegrees(Math.atan2(
+          destPoint.getPosition().getY() - sourcePoint.getPosition().getY(),
+          destPoint.getPosition().getX() - sourcePoint.getPosition().getX()
+      ));
+
+      //根据车头朝向角度计算车头方向
+      if (orientation == Vehicle.Orientation.BACKWARD)
+        angle += 180;  // 反向取反
+
+      // 将角度范围限制在[-180, 180)
+      if (angle >= 180)
+        angle -= 360;
+      return angle;
     }
   }
 }

@@ -20,6 +20,7 @@ public class Heartbeat extends Message {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class HeartbeatParams extends Params {
         private List<Integer> errors;
+        private Integer mode;
         private Integer status;
         private Integer position;
         private Double theta;

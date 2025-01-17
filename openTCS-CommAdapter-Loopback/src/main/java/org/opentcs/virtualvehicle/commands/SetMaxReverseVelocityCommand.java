@@ -12,33 +12,27 @@ import org.opentcs.drivers.vehicle.VehicleCommAdapter;
 import org.opentcs.virtualvehicle.LoopbackCommunicationAdapter;
 
 /**
- * A command to pause/unpause the vehicle.
+ * A command to set a vehicle's maximum reverse velocity.
  */
-public class SetVehiclePausedCommand
+public class SetMaxReverseVelocityCommand
     implements AdapterCommand {
 
   /**
-   * Whether to pause/unpause the vehicle.
+   * The maximum reverse velocity to set.
    */
-  private final boolean paused;
+  private final int velocity;
 
   /**
    * Creates a new instance.
    *
-   * @param paused Whether to pause/unpause the vehicle.
+   * @param velocity The maximum reverse velocity to set.
    */
-  public SetVehiclePausedCommand(boolean paused) {
-    this.paused = paused;
+  public SetMaxReverseVelocityCommand(int velocity) {
+    this.velocity = velocity;
   }
 
   @Override
   public void execute(VehicleCommAdapter adapter) {
-    if (!(adapter instanceof LoopbackCommunicationAdapter)) {
-      return;
-    }
-
-    LoopbackCommunicationAdapter loopbackAdapter = (LoopbackCommunicationAdapter) adapter;
-    loopbackAdapter.getProcessModel().setVehiclePaused(paused);
+    ((LoopbackCommunicationAdapter) adapter).getProcessModel().setMaxRevVelocity(velocity);
   }
-
 }

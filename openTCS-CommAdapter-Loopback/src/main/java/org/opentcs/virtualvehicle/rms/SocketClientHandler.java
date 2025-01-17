@@ -25,12 +25,14 @@ public class SocketClientHandler extends SimpleChannelInboundHandler<Message> {
 
   @Override
   public void channelActive(@NonNull ChannelHandlerContext ctx) {
+    // 连接成功后，开启定时发送心跳的任务
     if (hbFuture == null || hbFuture.isCancelled()) {
       hbFuture = scheduledTimer.scheduleAtFixedRate(
           socketClient::sendHeartbeat,
           0, SocketConstants.HEARTBEAT_INTERVAL_MILLIS, TimeUnit.MILLISECONDS
       );
     }
+    // 连接成功后，开启定时扫描待重发指令的任务
     if (resendFuture == null || resendFuture.isCancelled()) {
       resendFuture = scheduledTimer.scheduleAtFixedRate(
           socketClient::scanResendTable,
@@ -45,7 +47,7 @@ public class SocketClientHandler extends SimpleChannelInboundHandler<Message> {
     if (hbFuture != null) {
       hbFuture.cancel(true);
     }
-    // 停止定时查询应答任务
+    // 定时扫描待重发指令的任务
     if (resendFuture != null) {
       resendFuture.cancel(true);
     }

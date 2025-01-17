@@ -1,6 +1,6 @@
 /**
  * Copyright (c) The openTCS Authors.
- *
+ * <p>
  * This program is free software and subject to the MIT license. (For details,
  * see the licensing information (LICENSE.txt) you should have received with
  * this copy of the software.)
@@ -8,13 +8,17 @@
 package org.opentcs.virtualvehicle;
 
 import static com.google.common.base.Preconditions.checkArgument;
+
 import java.io.Serializable;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
+
 import static java.util.Objects.requireNonNull;
+
 import java.util.Queue;
 import java.util.Set;
+
 import org.opentcs.data.model.Vehicle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -220,6 +224,14 @@ public class VelocityController {
     return currentVelocity;
   }
 
+  public void setCurrentVelocity(int currentVelocity) {
+    this.currentVelocity = currentVelocity;
+    // Let the listeners know about the new velocity value.
+    for (VelocityListener curListener : velocityListeners) {
+      curListener.addVelocityValue(currentVelocity);
+    }
+  }
+
   /**
    * Returns the vehicle's current position (in mm from the beginning of the
    * current way entry.
@@ -298,8 +310,7 @@ public class VelocityController {
       accelerationDistance = 1;
       currentAcceleration = 0;
       currentVelocity = 0;
-    }
-    else {
+    } else {
       final int maxVelocity;
       final Vehicle.Orientation orientation = curWayEntry.vehicleOrientation;
       switch (orientation) {
@@ -319,7 +330,7 @@ public class VelocityController {
       // Recompute the acceleration to reach/keep the desired velocity.
       currentAcceleration
           = (currentVelocity == targetVelocity) ? 0
-              : suitableAcceleration(targetVelocity, accelerationDistance);
+          : suitableAcceleration(targetVelocity, accelerationDistance);
       // Recompute current velocity.
       currentVelocity = oldVelocity + currentAcceleration * dt / 1000;
       // Recompute current position.
@@ -337,6 +348,11 @@ public class VelocityController {
     for (VelocityListener curListener : velocityListeners) {
       curListener.addVelocityValue(currentVelocity);
     }
+  }
+
+  public void finishCurWayEntry() {
+    currentPosition = 0;
+    wayEntries.poll();
   }
 
   /**
@@ -369,8 +385,7 @@ public class VelocityController {
     LOG.debug("result = " + result);
     if (result > maxAcceleration) {
       result = maxAcceleration;
-    }
-    else if (result < maxDeceleration) {
+    } else if (result < maxDeceleration) {
       result = maxDeceleration;
     }
     return result;
@@ -398,6 +413,11 @@ public class VelocityController {
      * The vehicle's orientation on this way.
      */
     private final Vehicle.Orientation vehicleOrientation;
+    /**
+     * 执行此路段的车辆的车头朝向角度（角度制）.
+     * 据起点、终点坐标以及是否倒走来计算车头朝向；如果起始点为空，则车头朝向角度为NaN.
+     */
+    private final double vehicleDirection;
 
     /**
      * Creates a new WayEntry.
@@ -411,18 +431,27 @@ public class VelocityController {
                     int maxVelocity,
                     String destPointName,
                     Vehicle.Orientation orientation) {
+      this(length, maxVelocity, destPointName, orientation, 0.0);
+    }
+
+    public WayEntry(long length,
+                    int maxVelocity,
+                    String destPointName,
+                    Vehicle.Orientation orientation,
+                    double direction) {
       checkArgument(length > 0, "length is not > 0 but %s", length);
       this.length = length;
       if (maxVelocity < 1) {
         LOG.warn("maxVelocity is zero or negative, setting to 100");
         this.targetVelocity = 100;
-      }
-      else {
+      } else {
         this.targetVelocity = maxVelocity;
       }
       this.destPointName = requireNonNull(destPointName, "destPointName");
       this.vehicleOrientation = requireNonNull(orientation, "vehicleOrientation");
+      this.vehicleDirection = direction;
     }
+
 
     /**
      * Returns the name of the destination point.
@@ -433,6 +462,24 @@ public class VelocityController {
       return destPointName;
     }
 
+    /**
+     * Returns the vehicle's orientation on this way.
+     *
+     * @return The vehicle's orientation on this way.
+     */
+    public Vehicle.Orientation getVehicleOrientation() {
+      return vehicleOrientation;
+    }
+
+    /**
+     * Returns the vehicle's direction on this way.
+     *
+     * @return The vehicle's direction on this way.
+     */
+    public double getVehicleDirection() {
+      return vehicleDirection;
+    }
+
     @Override
     public boolean equals(Object o) {
       if (o instanceof WayEntry) {
@@ -441,8 +488,7 @@ public class VelocityController {
             && other.targetVelocity == targetVelocity
             && destPointName.equals(other.destPointName)
             && vehicleOrientation.equals(other.vehicleOrientation);
-      }
-      else {
+      } else {
         return false;
       }
     }

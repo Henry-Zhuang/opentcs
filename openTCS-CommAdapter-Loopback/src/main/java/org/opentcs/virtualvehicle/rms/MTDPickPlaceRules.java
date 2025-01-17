@@ -16,47 +16,48 @@ public class MTDPickPlaceRules {
     String type = cmd.getType();
     if (type.equals(Command.Type.PICK.getType())){  // 取箱指令校验
       // 抓空校验
-      checkArgument(stack_layers >= toteZ, "取箱指令取堆塔的空位置");
+      if (toteZ < 50)
+        checkArgument(stack_layers >= toteZ, "toteZ must be <= stack_layers for pick command(if toteZ < 50)");
       // 放空校验
-      checkArgument(buffer_layers + 1 >= bufferZ, "取箱指令取至背篓悬空位置");
+      checkArgument(buffer_layers + 1 >= bufferZ, "bufferZ must be <= buffer_layers + 1 for pick command");
       if (bufferZ == MTD_MAX){
-        checkArgument(toteZ != 1, "1-N非法指令");
-        checkArgument(stack_layers == toteZ, "取至背篓第N层时，待取料箱上方不可有障碍箱");
+        checkArgument(toteZ != 1, "1 to N invalid command");
+        checkArgument(stack_layers == toteZ, "no obstacles allowed above toteZ when bufferZ == MAX_LAYER");
       } else if (bufferZ == 1) {
-        checkArgument(toteZ != MTD_MAX, "N-1非法指令");
+        checkArgument(toteZ != MTD_MAX, "N to 1 invalid command");
         checkArgument(
             buffer_layers + 1 == bufferZ || stack_layers == toteZ,
-            "取至背篓第1层时，若背篓1层有障碍箱，则待取料箱上方不可有障碍箱"
+            "no obstacles allowed above toteZ when bufferZ == 1 and there are obstacles above bufferZ"
         );
       }
       if (toteZ == MTD_MAX){
-        checkArgument(buffer_layers + 1 == bufferZ, "取堆塔第N层时，只能放到背篓最上层");
+        checkArgument(buffer_layers + 1 == bufferZ, "bufferZ must be the top of the buffer when toteZ == MAX_LAYER");
       } else if (toteZ == 1) {
         checkArgument(
             buffer_layers + 1 == bufferZ || stack_layers == toteZ,
-            "取堆塔第1层时，若待取料箱上方有障碍箱，则只能放在背篓最上层");
+            "bufferZ must be the top of the buffer when toteZ == 1 and there are obstacles above toteZ");
       }
     } else if (type.equals(Command.Type.PLACE.getType())){  // 放箱指令校验
       // 抓空校验
-      checkArgument(buffer_layers >= bufferZ, "放箱指令取背篓的空位置");
+      checkArgument(buffer_layers >= bufferZ, "bufferZ must be <= buffer_layers for place command");
       // 放空校验
-      checkArgument(stack_layers + 1 >= toteZ, "放箱指令放至堆塔悬空位置");
+      checkArgument(stack_layers + 1 >= toteZ, "toteZ must be <= stack_layers + 1 for place command");
       if (bufferZ == MTD_MAX){
-        checkArgument(toteZ != 1, "1-N非法指令");
-        checkArgument(stack_layers + 1 == toteZ, "将背篓第N层料箱放至堆塔时，只能放到堆塔最上层");
+        checkArgument(toteZ != 1, "1 to N invalid command");
+        checkArgument(stack_layers + 1 == toteZ, "no obstacles allowed above toteZ when bufferZ == MAX_LAYER");
       } else if (bufferZ == 1) {
-        checkArgument(toteZ != MTD_MAX, "N-1非法指令");
+        checkArgument(toteZ != MTD_MAX, "N to 1 invalid command");
         checkArgument(
             buffer_layers == bufferZ || stack_layers + 1 == toteZ,
-            "将背篓第1层料箱放至堆塔时，若背篓第1层上方有障碍箱，则只能放到堆塔最上层"
+            "no obstacles allowed above toteZ when bufferZ == 1 and there are obstacles above bufferZ"
         );
       }
       if (toteZ == MTD_MAX){
-        checkArgument(buffer_layers == bufferZ, "放至堆塔第N层时，待取背篓料箱上方不可有障碍箱");
+        checkArgument(buffer_layers == bufferZ, "no obstacles allowed above bufferZ when toteZ == MAX_LAYER");
       } else if (toteZ == 1) {
         checkArgument(
             buffer_layers == bufferZ || stack_layers + 1 == toteZ,
-            "放至堆塔第1层时，若堆塔1层有障碍箱，则背篓待取料箱上方不可有障碍箱"
+            "no obstacles allowed above bufferZ when toteZ == 1 and there are obstacles above toteZ"
         );
       }
     }

@@ -62,7 +62,7 @@ public final class DropdownListInputPanel<E>
 
     setLayout(new java.awt.GridBagLayout());
 
-    messageLabel.setFont(new java.awt.Font("Arial", 0, 11)); // NOI18N
+    messageLabel.setFont(new java.awt.Font("Microsoft YaHei", 0, 11)); // NOI18N
     messageLabel.setText("Message");
     gridBagConstraints = new java.awt.GridBagConstraints();
     gridBagConstraints.gridx = 0;
@@ -73,7 +73,7 @@ public final class DropdownListInputPanel<E>
     gridBagConstraints.insets = new java.awt.Insets(3, 3, 3, 3);
     add(messageLabel, gridBagConstraints);
 
-    label.setFont(new java.awt.Font("Arial", 0, 11)); // NOI18N
+    label.setFont(new java.awt.Font("Microsoft YaHei", 0, 11)); // NOI18N
     label.setText("Label");
     gridBagConstraints = new java.awt.GridBagConstraints();
     gridBagConstraints.gridx = 0;
@@ -81,7 +81,7 @@ public final class DropdownListInputPanel<E>
     gridBagConstraints.insets = new java.awt.Insets(3, 3, 3, 3);
     add(label, gridBagConstraints);
 
-    comboBox.setFont(new java.awt.Font("Arial", 0, 11)); // NOI18N
+    comboBox.setFont(new java.awt.Font("Microsoft YaHei", 0, 11)); // NOI18N
     gridBagConstraints = new java.awt.GridBagConstraints();
     gridBagConstraints.gridx = 1;
     gridBagConstraints.gridy = 1;

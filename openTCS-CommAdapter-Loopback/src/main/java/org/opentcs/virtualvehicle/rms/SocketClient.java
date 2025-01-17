@@ -89,6 +89,7 @@ public class SocketClient implements EventHandler, Lifecycle {
       return;
     }
 
+    // 初始化定时器，用于定时扫描重发表
     scheduledTimer = new ScheduledThreadPoolExecutor(
         2, new DefaultThreadFactory(String.format("%s_Timer", getVehicleName()), true)
     );
@@ -225,12 +226,16 @@ public class SocketClient implements EventHandler, Lifecycle {
       OrderFinalStateEvent evt = (OrderFinalStateEvent) event;
       if (evt.getOrderType().equals(OrderConstants.TYPE_NONE))
         return;
+      UnsignedLong uniqueID = NameConvertor.toCommandId(evt.getOrderName());
+      if (uniqueID == null)
+        return;
       int errorCode = evt.getFinalState().equals(TransportOrder.State.FINISHED) ?
           Result.ErrorCode.SUCCEED.ordinal() : Result.ErrorCode.FAIL.ordinal();
       int errorReason = errorCode == 0 ?
           Result.ErrorReason.NONE.getValue() : Result.ErrorReason.OTHER_REASON.getValue();
+      sendHeartbeat();
       sendResult(
-          NameConvertor.toCommandId(evt.getOrderName()),
+          uniqueID,
           Command.Type.fromString(evt.getOrderType()),
           errorCode,
           errorReason,
@@ -298,7 +303,8 @@ public class SocketClient implements EventHandler, Lifecycle {
       case PLACE:
       case JOINT:
       case JOINT_B:
-        executePickPlaceJoint(cmd);
+      case PATROL:
+        executePickPlaceJointPatrol(cmd);
         break;
       case MOVE:
         executeMove(cmd);
@@ -317,14 +323,14 @@ public class SocketClient implements EventHandler, Lifecycle {
     }
   }
 
-  private void executePickPlaceJoint(Command cmd) {
+  private void executePickPlaceJointPatrol(Command cmd) {
     // 校验机器人是否处于非充电状态
     checkState(!vehicleModel.isChargerConnected(), "机器人处于充电状态，请先停止充电，再执行其他指令");
     // 参数校验
     List<Command.CommandParams.TargetID> targetIds
         = requireNonNull(cmd.getParams().getTargetID(), "targetIds");
-    checkArgument(targetIds.size() == 1, "pick/place/joint targetIds size must be 1");
-    if (!isJointCommand(cmd) && getRobotType().equals(RobotType.MT_D)){
+    checkArgument(targetIds.size() == 1, "pick/place/joint/patrol targetIds size must be 1");
+    if (isPickPlaceCommand(cmd) && getRobotType().equals(RobotType.MT_D)){
       MTDPickPlaceRules.validate(cmd);  // 校验MT_D取放箱特殊情况
     }
     // 创建指令记录，并执行指令
@@ -338,6 +344,11 @@ public class SocketClient implements EventHandler, Lifecycle {
         .withType(cmd.getType());
     orderService.createTransportOrder(orderTO);
     dispatcherService.dispatch();
+  }
+
+  private boolean isPickPlaceCommand(Command cmd) {
+    List<String> pickPlaceTypes = Arrays.asList(Command.Type.PICK.getType(), Command.Type.PLACE.getType());
+    return pickPlaceTypes.contains(cmd.getType()) && cmd.getParams().getToteZ() < 50;
   }
 
   private boolean isJointCommand(Command cmd) {
@@ -485,8 +496,8 @@ public class SocketClient implements EventHandler, Lifecycle {
         MessageGenerator.generateHeartbeat(
             vehicleModel,
             getRobotType(),
-            vehicleModel.isMoving(),
-            isLaneY
+            isLaneY,
+            vehicleModel.isVehiclePaused()
         ),
         false
     );

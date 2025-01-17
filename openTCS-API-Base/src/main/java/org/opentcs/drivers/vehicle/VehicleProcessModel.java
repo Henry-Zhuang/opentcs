@@ -109,6 +109,10 @@ public class VehicleProcessModel {
    */
   private volatile boolean moving = false;
   /**
+   * Indicates whether this virtual vehicle is operating or not.
+   */
+  private volatile boolean operating = false;
+  /**
    * Creates a new instance.
    *
    * @param attachedVehicle The vehicle attached to the new instance.
@@ -421,6 +425,10 @@ public class VehicleProcessModel {
                                                    "Vehicle state is no longer ERROR",
                                                    UserNotification.Level.NOTEWORTHY));
     }
+
+    if (oldState == Vehicle.State.CHARGING && newState != Vehicle.State.CHARGING) {
+      setChargerConnected(false);
+    }
   }
 
   /**
@@ -446,7 +454,7 @@ public class VehicleProcessModel {
                                                   length);
   }
 
-  public synchronized boolean isChargerConnected() {
+  public boolean isChargerConnected() {
     return chargerConnected;
   }
 
@@ -454,7 +462,7 @@ public class VehicleProcessModel {
     this.chargerConnected = chargerConnected;
   }
 
-  public synchronized UnsignedLong getUniqueId() {
+  public UnsignedLong getUniqueId() {
     return uniqueId;
   }
 
@@ -462,12 +470,24 @@ public class VehicleProcessModel {
     this.uniqueId = uniqueId;
   }
 
-  public synchronized boolean isMoving() {
+  public boolean isMoving() {
     return moving;
   }
 
   public synchronized void setMoving(boolean moving) {
     this.moving = moving;
+  }
+
+  public boolean isOperating() {
+    return operating;
+  }
+
+  public synchronized void setOperating(boolean operating) {
+    this.operating = operating;
+  }
+
+  public double getMaxAngularVelocity() {
+    return vehicle.getMaxAngularVelocity();
   }
 
   /**

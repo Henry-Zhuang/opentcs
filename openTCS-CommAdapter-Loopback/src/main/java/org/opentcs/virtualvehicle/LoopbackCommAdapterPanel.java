@@ -8,14 +8,11 @@
 package org.opentcs.virtualvehicle;
 
 import com.google.inject.assistedinject.Assisted;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
+
+import java.util.*;
+
 import static java.util.Objects.requireNonNull;
-import java.util.ResourceBundle;
-import java.util.Set;
+
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;
 import org.opentcs.components.kernel.services.VehicleService;
@@ -34,18 +31,8 @@ import org.opentcs.util.CallWrapper;
 import org.opentcs.util.Comparators;
 import org.opentcs.util.gui.StringListCellRenderer;
 import static org.opentcs.virtualvehicle.I18nLoopbackCommAdapter.BUNDLE_PATH;
-import org.opentcs.virtualvehicle.commands.CurrentMovementCommandFailedCommand;
-import org.opentcs.virtualvehicle.commands.PublishEventCommand;
-import org.opentcs.virtualvehicle.commands.SetEnergyLevelCommand;
-import org.opentcs.virtualvehicle.commands.SetLoadHandlingDevicesCommand;
-import org.opentcs.virtualvehicle.commands.SetOrientationAngleCommand;
-import org.opentcs.virtualvehicle.commands.SetPositionCommand;
-import org.opentcs.virtualvehicle.commands.SetPrecisePositionCommand;
-import org.opentcs.virtualvehicle.commands.SetSingleStepModeEnabledCommand;
-import org.opentcs.virtualvehicle.commands.SetStateCommand;
-import org.opentcs.virtualvehicle.commands.SetVehiclePausedCommand;
-import org.opentcs.virtualvehicle.commands.SetVehiclePropertyCommand;
-import org.opentcs.virtualvehicle.commands.TriggerCommand;
+
+import org.opentcs.virtualvehicle.commands.*;
 import org.opentcs.virtualvehicle.inputcomponents.DropdownListInputPanel;
 import org.opentcs.virtualvehicle.inputcomponents.InputDialog;
 import org.opentcs.virtualvehicle.inputcomponents.InputPanel;
@@ -204,6 +191,7 @@ public class LoopbackCommAdapterPanel
   private void updateCommAdapterEnabled(boolean isEnabled) {
     SwingUtilities.invokeLater(() -> {
       setStatePanelEnabled(isEnabled);
+      setVehiclePropsPanelEnabled(isEnabled);
       chkBoxEnable.setSelected(isEnabled);
     });
   }
@@ -299,6 +287,14 @@ public class LoopbackCommAdapterPanel
     SwingUtilities.invokeLater(() -> pauseVehicleCheckBox.setEnabled(enabled));
   }
 
+  private void setVehiclePropsPanelEnabled(boolean enabled) {
+    SwingUtilities.invokeLater(() -> maxFwdVeloTxt.setEnabled(enabled));
+    SwingUtilities.invokeLater(() -> maxRevVeloTxt.setEnabled(enabled));
+    SwingUtilities.invokeLater(() -> maxAccelTxt.setEnabled(enabled));
+    SwingUtilities.invokeLater(() -> maxDecelTxt.setEnabled(enabled));
+    SwingUtilities.invokeLater(() -> opTimeTxt.setEnabled(enabled));
+  }
+
   private TCSObjectReference<Vehicle> getVehicleReference()
       throws Exception {
     return callWrapper.call(() -> vehicleService.
@@ -312,6 +308,16 @@ public class LoopbackCommAdapterPanel
     }
     catch (Exception ex) {
       LOG.warn("Error sending comm adapter command '{}'", command, ex);
+    }
+  }
+
+  private void setVehiclePaused(boolean isPaused) {
+    try {
+      TCSObjectReference<Vehicle> vehicleRef = getVehicleReference();
+      callWrapper.call(() -> vehicleService.updateVehiclePaused(vehicleRef, isPaused));
+    }
+    catch (Exception ex) {
+      LOG.warn("Error set vehicle paused state to '{}'", isPaused, ex);
     }
   }
 
@@ -348,6 +354,12 @@ public class LoopbackCommAdapterPanel
     opTimeTxt = new javax.swing.JTextField();
     profilesContainerPanel = new javax.swing.JPanel();
     filler1 = new javax.swing.Box.Filler(new java.awt.Dimension(0, 0), new java.awt.Dimension(0, 0), new java.awt.Dimension(32767, 0));
+    ExceptionPanel = new javax.swing.JPanel();
+    exceptionTriggerPanel = new javax.swing.JPanel();
+    errorTriggerButton = new javax.swing.JButton();
+    abruptStopTriggerButton = new javax.swing.JButton();
+    obsBlockTriggerButton = new javax.swing.JButton();
+    restoreVehicleButton = new javax.swing.JButton();
     vehicleStatePanel = new javax.swing.JPanel();
     stateContainerPanel = new javax.swing.JPanel();
     connectionPanel = new javax.swing.JPanel();
@@ -411,11 +423,17 @@ public class LoopbackCommAdapterPanel
     vehiclePropsPanel.add(maxFwdVeloLbl, gridBagConstraints);
 
     maxFwdVeloTxt.setEditable(false);
+    maxFwdVeloTxt.setBackground(new java.awt.Color(255, 255, 255));
     maxFwdVeloTxt.setColumns(5);
     maxFwdVeloTxt.setHorizontalAlignment(javax.swing.JTextField.RIGHT);
     maxFwdVeloTxt.setText("0");
     maxFwdVeloTxt.setBorder(javax.swing.BorderFactory.createEtchedBorder());
     maxFwdVeloTxt.setEnabled(false);
+    maxFwdVeloTxt.addMouseListener(new java.awt.event.MouseAdapter() {
+      public void mouseClicked(java.awt.event.MouseEvent evt) {
+        maxFwdVeloTxtMouseClicked(evt);
+      }
+    });
     gridBagConstraints = new java.awt.GridBagConstraints();
     gridBagConstraints.fill = java.awt.GridBagConstraints.BOTH;
     gridBagConstraints.insets = new java.awt.Insets(0, 0, 0, 3);
@@ -438,11 +456,17 @@ public class LoopbackCommAdapterPanel
     vehiclePropsPanel.add(maxRevVeloLbl, gridBagConstraints);
 
     maxRevVeloTxt.setEditable(false);
+    maxRevVeloTxt.setBackground(new java.awt.Color(255, 255, 255));
     maxRevVeloTxt.setColumns(5);
     maxRevVeloTxt.setHorizontalAlignment(javax.swing.JTextField.RIGHT);
     maxRevVeloTxt.setText("0");
     maxRevVeloTxt.setBorder(javax.swing.BorderFactory.createEtchedBorder());
     maxRevVeloTxt.setEnabled(false);
+    maxRevVeloTxt.addMouseListener(new java.awt.event.MouseAdapter() {
+      public void mouseClicked(java.awt.event.MouseEvent evt) {
+        maxRevVeloTxtMouseClicked(evt);
+      }
+    });
     gridBagConstraints = new java.awt.GridBagConstraints();
     gridBagConstraints.gridx = 1;
     gridBagConstraints.gridy = 1;
@@ -469,11 +493,17 @@ public class LoopbackCommAdapterPanel
     vehiclePropsPanel.add(maxAccelLbl, gridBagConstraints);
 
     maxAccelTxt.setEditable(false);
+    maxAccelTxt.setBackground(new java.awt.Color(255, 255, 255));
     maxAccelTxt.setColumns(5);
     maxAccelTxt.setHorizontalAlignment(javax.swing.JTextField.RIGHT);
     maxAccelTxt.setText("1000");
     maxAccelTxt.setBorder(javax.swing.BorderFactory.createEtchedBorder());
     maxAccelTxt.setEnabled(false);
+    maxAccelTxt.addMouseListener(new java.awt.event.MouseAdapter() {
+      public void mouseClicked(java.awt.event.MouseEvent evt) {
+        maxAccelTxtMouseClicked(evt);
+      }
+    });
     gridBagConstraints = new java.awt.GridBagConstraints();
     gridBagConstraints.gridx = 1;
     gridBagConstraints.gridy = 2;
@@ -490,11 +520,17 @@ public class LoopbackCommAdapterPanel
     vehiclePropsPanel.add(maxAccelUnitLbl, gridBagConstraints);
 
     maxDecelTxt.setEditable(false);
+    maxDecelTxt.setBackground(new java.awt.Color(255, 255, 255));
     maxDecelTxt.setColumns(5);
     maxDecelTxt.setHorizontalAlignment(javax.swing.JTextField.RIGHT);
     maxDecelTxt.setText("1000");
     maxDecelTxt.setBorder(javax.swing.BorderFactory.createEtchedBorder());
     maxDecelTxt.setEnabled(false);
+    maxDecelTxt.addMouseListener(new java.awt.event.MouseAdapter() {
+      public void mouseClicked(java.awt.event.MouseEvent evt) {
+        maxDecelTxtMouseClicked(evt);
+      }
+    });
     gridBagConstraints = new java.awt.GridBagConstraints();
     gridBagConstraints.gridx = 1;
     gridBagConstraints.gridy = 3;
@@ -538,11 +574,17 @@ public class LoopbackCommAdapterPanel
     vehiclePropsPanel.add(defaultOpTimeUntiLbl, gridBagConstraints);
 
     opTimeTxt.setEditable(false);
+    opTimeTxt.setBackground(new java.awt.Color(255, 255, 255));
     opTimeTxt.setColumns(5);
     opTimeTxt.setHorizontalAlignment(javax.swing.JTextField.RIGHT);
     opTimeTxt.setText("1000");
     opTimeTxt.setBorder(javax.swing.BorderFactory.createEtchedBorder());
     opTimeTxt.setEnabled(false);
+    opTimeTxt.addMouseListener(new java.awt.event.MouseAdapter() {
+      public void mouseClicked(java.awt.event.MouseEvent evt) {
+        opTimeTxtMouseClicked(evt);
+      }
+    });
     gridBagConstraints = new java.awt.GridBagConstraints();
     gridBagConstraints.gridx = 1;
     gridBagConstraints.gridy = 4;
@@ -560,6 +602,61 @@ public class LoopbackCommAdapterPanel
     profilesContainerPanel.add(filler1, java.awt.BorderLayout.CENTER);
 
     vehicleBahaviourPanel.add(profilesContainerPanel, java.awt.BorderLayout.SOUTH);
+
+    ExceptionPanel.setMinimumSize(new java.awt.Dimension(247, 131));
+    ExceptionPanel.setPreferredSize(new java.awt.Dimension(301, 131));
+
+    exceptionTriggerPanel.setBorder(javax.swing.BorderFactory.createTitledBorder(BUNDLE.getString("loopbackCommAdapterPanel.panel_exceptionTriggerPanel.border.title"))); // NOI18N
+    exceptionTriggerPanel.setMinimumSize(new java.awt.Dimension(247, 151));
+    exceptionTriggerPanel.setPreferredSize(new java.awt.Dimension(301, 151));
+
+    errorTriggerButton.setText(BUNDLE.getString("loopbackCommAdapterPanel.button_errorTrigger.text")); // NOI18N
+    errorTriggerButton.setMaximumSize(new java.awt.Dimension(247, 23));
+    errorTriggerButton.setMinimumSize(new java.awt.Dimension(247, 23));
+    errorTriggerButton.setPreferredSize(new java.awt.Dimension(247, 23));
+    errorTriggerButton.addActionListener(new java.awt.event.ActionListener() {
+      public void actionPerformed(java.awt.event.ActionEvent evt) {
+        errorTriggerButtonActionPerformed(evt);
+      }
+    });
+    exceptionTriggerPanel.add(errorTriggerButton);
+
+    abruptStopTriggerButton.setText(BUNDLE.getString("loopbackCommAdapterPanel.button_abruptStopTrigger.text")); // NOI18N
+    abruptStopTriggerButton.setMaximumSize(new java.awt.Dimension(247, 23));
+    abruptStopTriggerButton.setMinimumSize(new java.awt.Dimension(247, 23));
+    abruptStopTriggerButton.setPreferredSize(new java.awt.Dimension(247, 23));
+    abruptStopTriggerButton.addActionListener(new java.awt.event.ActionListener() {
+      public void actionPerformed(java.awt.event.ActionEvent evt) {
+        abruptStopTriggerButtonActionPerformed(evt);
+      }
+    });
+    exceptionTriggerPanel.add(abruptStopTriggerButton);
+
+    obsBlockTriggerButton.setText(BUNDLE.getString("loopbackCommAdapterPanel.button_obsBlockTrigger.text")); // NOI18N
+    obsBlockTriggerButton.setMaximumSize(new java.awt.Dimension(247, 23));
+    obsBlockTriggerButton.setMinimumSize(new java.awt.Dimension(247, 23));
+    obsBlockTriggerButton.setPreferredSize(new java.awt.Dimension(247, 23));
+    obsBlockTriggerButton.addActionListener(new java.awt.event.ActionListener() {
+      public void actionPerformed(java.awt.event.ActionEvent evt) {
+        obsBlockTriggerButtonActionPerformed(evt);
+      }
+    });
+    exceptionTriggerPanel.add(obsBlockTriggerButton);
+
+    restoreVehicleButton.setText(BUNDLE.getString("loopbackCommAdapterPanel.button_restoreVehicle.text")); // NOI18N
+    restoreVehicleButton.setMaximumSize(new java.awt.Dimension(247, 23));
+    restoreVehicleButton.setMinimumSize(new java.awt.Dimension(247, 23));
+    restoreVehicleButton.setPreferredSize(new java.awt.Dimension(247, 23));
+    restoreVehicleButton.addActionListener(new java.awt.event.ActionListener() {
+      public void actionPerformed(java.awt.event.ActionEvent evt) {
+        restoreVehicleButtonActionPerformed(evt);
+      }
+    });
+    exceptionTriggerPanel.add(restoreVehicleButton);
+
+    ExceptionPanel.add(exceptionTriggerPanel);
+
+    vehicleBahaviourPanel.add(ExceptionPanel, java.awt.BorderLayout.WEST);
 
     add(vehicleBahaviourPanel, java.awt.BorderLayout.CENTER);
 
@@ -649,8 +746,7 @@ public class LoopbackCommAdapterPanel
 
     orientationAngleTxt.setEditable(false);
     orientationAngleTxt.setBackground(new java.awt.Color(255, 255, 255));
-    java.util.ResourceBundle bundle = java.util.ResourceBundle.getBundle("i18n/org/opentcs/commadapter/loopback/Bundle"); // NOI18N
-    orientationAngleTxt.setText(bundle.getString("loopbackCommAdapterPanel.textField_orientationAngle.angleNotSetPlaceholder")); // NOI18N
+    orientationAngleTxt.setText(BUNDLE.getString("loopbackCommAdapterPanel.textField_orientationAngle.angleNotSetPlaceholder")); // NOI18N
     orientationAngleTxt.setBorder(javax.swing.BorderFactory.createEtchedBorder());
     orientationAngleTxt.setName("orientationAngleTxt"); // NOI18N
     orientationAngleTxt.addMouseListener(new java.awt.event.MouseAdapter() {
@@ -667,7 +763,7 @@ public class LoopbackCommAdapterPanel
     curPosPanel.add(orientationAngleTxt, gridBagConstraints);
 
     energyLevelLabel.setHorizontalAlignment(javax.swing.SwingConstants.TRAILING);
-    energyLevelLabel.setText(bundle.getString("loopbackCommAdapterPanel.label_energyLevel.text")); // NOI18N
+    energyLevelLabel.setText(BUNDLE.getString("loopbackCommAdapterPanel.label_energyLevel.text")); // NOI18N
     gridBagConstraints = new java.awt.GridBagConstraints();
     gridBagConstraints.gridx = 0;
     gridBagConstraints.gridy = 2;
@@ -676,7 +772,7 @@ public class LoopbackCommAdapterPanel
     curPosPanel.add(energyLevelLabel, gridBagConstraints);
 
     orientationLabel.setHorizontalAlignment(javax.swing.SwingConstants.RIGHT);
-    orientationLabel.setText(bundle.getString("loopbackCommAdapterPanel.label_orientationAngle.text")); // NOI18N
+    orientationLabel.setText(BUNDLE.getString("loopbackCommAdapterPanel.label_orientationAngle.text")); // NOI18N
     gridBagConstraints = new java.awt.GridBagConstraints();
     gridBagConstraints.gridx = 0;
     gridBagConstraints.gridy = 4;
@@ -701,7 +797,7 @@ public class LoopbackCommAdapterPanel
     curPosPanel.add(positionTxt, gridBagConstraints);
 
     positionLabel.setHorizontalAlignment(javax.swing.SwingConstants.TRAILING);
-    positionLabel.setText(bundle.getString("loopbackCommAdapterPanel.label_position.text")); // NOI18N
+    positionLabel.setText(BUNDLE.getString("loopbackCommAdapterPanel.label_position.text")); // NOI18N
     gridBagConstraints = new java.awt.GridBagConstraints();
     gridBagConstraints.gridx = 0;
     gridBagConstraints.gridy = 0;
@@ -710,7 +806,7 @@ public class LoopbackCommAdapterPanel
     curPosPanel.add(positionLabel, gridBagConstraints);
 
     pauseVehicleLabel.setHorizontalAlignment(javax.swing.SwingConstants.TRAILING);
-    pauseVehicleLabel.setText(bundle.getString("loopbackCommAdapterPanel.label_pauseVehicle.text")); // NOI18N
+    pauseVehicleLabel.setText(BUNDLE.getString("loopbackCommAdapterPanel.label_pauseVehicle.text")); // NOI18N
     gridBagConstraints = new java.awt.GridBagConstraints();
     gridBagConstraints.gridx = 0;
     gridBagConstraints.gridy = 5;
@@ -719,7 +815,7 @@ public class LoopbackCommAdapterPanel
     curPosPanel.add(pauseVehicleLabel, gridBagConstraints);
 
     jLabel2.setHorizontalAlignment(javax.swing.SwingConstants.TRAILING);
-    jLabel2.setText(bundle.getString("loopbackCommAdapterPanel.label_state.text")); // NOI18N
+    jLabel2.setText(BUNDLE.getString("loopbackCommAdapterPanel.label_state.text")); // NOI18N
     gridBagConstraints = new java.awt.GridBagConstraints();
     gridBagConstraints.gridx = 0;
     gridBagConstraints.gridy = 1;
@@ -746,7 +842,7 @@ public class LoopbackCommAdapterPanel
     curPosPanel.add(stateTxt, gridBagConstraints);
 
     jLabel3.setHorizontalAlignment(javax.swing.SwingConstants.TRAILING);
-    jLabel3.setText(bundle.getString("loopbackCommAdapterPanel.label_precisePosition.text")); // NOI18N
+    jLabel3.setText(BUNDLE.getString("loopbackCommAdapterPanel.label_precisePosition.text")); // NOI18N
     gridBagConstraints = new java.awt.GridBagConstraints();
     gridBagConstraints.gridx = 0;
     gridBagConstraints.gridy = 3;
@@ -775,10 +871,10 @@ public class LoopbackCommAdapterPanel
     stateContainerPanel.add(curPosPanel);
     curPosPanel.getAccessibleContext().setAccessibleName("Change");
 
-    propertySetterPanel.setBorder(javax.swing.BorderFactory.createTitledBorder(bundle.getString("loopbackCommAdapterPanel.panel_vehicleProperty.border.title"))); // NOI18N
+    propertySetterPanel.setBorder(javax.swing.BorderFactory.createTitledBorder(BUNDLE.getString("loopbackCommAdapterPanel.panel_vehicleProperty.border.title"))); // NOI18N
     propertySetterPanel.setLayout(new java.awt.GridBagLayout());
 
-    keyLabel.setText(bundle.getString("loopbackCommAdapterPanel.label_propertyKey.text")); // NOI18N
+    keyLabel.setText(BUNDLE.getString("loopbackCommAdapterPanel.label_propertyKey.text")); // NOI18N
     gridBagConstraints = new java.awt.GridBagConstraints();
     gridBagConstraints.gridx = 0;
     gridBagConstraints.gridy = 1;
@@ -794,7 +890,7 @@ public class LoopbackCommAdapterPanel
     gridBagConstraints.gridy = 2;
     propertySetterPanel.add(valueTextField, gridBagConstraints);
 
-    propSetButton.setText(bundle.getString("loopbackCommAdapterPanel.button_setProperty.text")); // NOI18N
+    propSetButton.setText(BUNDLE.getString("loopbackCommAdapterPanel.button_setProperty.text")); // NOI18N
     propSetButton.addActionListener(new java.awt.event.ActionListener() {
       public void actionPerformed(java.awt.event.ActionEvent evt) {
         propSetButtonActionPerformed(evt);
@@ -807,7 +903,7 @@ public class LoopbackCommAdapterPanel
     propertySetterPanel.add(propSetButton, gridBagConstraints);
 
     propertyEditorGroup.add(removePropRadioBtn);
-    removePropRadioBtn.setText(bundle.getString("loopbackCommAdapterPanel.radioButton_removeProperty.text")); // NOI18N
+    removePropRadioBtn.setText(BUNDLE.getString("loopbackCommAdapterPanel.radioButton_removeProperty.text")); // NOI18N
     removePropRadioBtn.addActionListener(new java.awt.event.ActionListener() {
       public void actionPerformed(java.awt.event.ActionEvent evt) {
         removePropRadioBtnActionPerformed(evt);
@@ -821,7 +917,7 @@ public class LoopbackCommAdapterPanel
 
     propertyEditorGroup.add(setPropValueRadioBtn);
     setPropValueRadioBtn.setSelected(true);
-    setPropValueRadioBtn.setText(bundle.getString("loopbackCommAdapterPanel.radioButton_setProperty.text")); // NOI18N
+    setPropValueRadioBtn.setText(BUNDLE.getString("loopbackCommAdapterPanel.radioButton_setProperty.text")); // NOI18N
     setPropValueRadioBtn.addActionListener(new java.awt.event.ActionListener() {
       public void actionPerformed(java.awt.event.ActionEvent evt) {
         setPropValueRadioBtnActionPerformed(evt);
@@ -848,10 +944,10 @@ public class LoopbackCommAdapterPanel
 
     stateContainerPanel.add(propertySetterPanel);
 
-    eventPanel.setBorder(javax.swing.BorderFactory.createTitledBorder(bundle.getString("loopbackCommAdapterPanel.panel_eventDispatching.title"))); // NOI18N
+    eventPanel.setBorder(javax.swing.BorderFactory.createTitledBorder(BUNDLE.getString("loopbackCommAdapterPanel.panel_eventDispatching.title"))); // NOI18N
     eventPanel.setLayout(new java.awt.GridBagLayout());
 
-    includeAppendixCheckBox.setText(bundle.getString("loopbackCommAdapterPanel.checkBox_includeAppendix.text")); // NOI18N
+    includeAppendixCheckBox.setText(BUNDLE.getString("loopbackCommAdapterPanel.checkBox_includeAppendix.text")); // NOI18N
     includeAppendixCheckBox.addItemListener(new java.awt.event.ItemListener() {
       public void itemStateChanged(java.awt.event.ItemEvent evt) {
         includeAppendixCheckBoxItemStateChanged(evt);
@@ -869,7 +965,7 @@ public class LoopbackCommAdapterPanel
     gridBagConstraints.insets = new java.awt.Insets(0, 3, 0, 0);
     eventPanel.add(appendixTxt, gridBagConstraints);
 
-    dispatchEventButton.setText(bundle.getString("loopbackCommAdapterPanel.button_dispatchEvent.text")); // NOI18N
+    dispatchEventButton.setText(BUNDLE.getString("loopbackCommAdapterPanel.button_dispatchEvent.text")); // NOI18N
     dispatchEventButton.addActionListener(new java.awt.event.ActionListener() {
       public void actionPerformed(java.awt.event.ActionEvent evt) {
         dispatchEventButtonActionPerformed(evt);
@@ -884,7 +980,7 @@ public class LoopbackCommAdapterPanel
     gridBagConstraints.insets = new java.awt.Insets(3, 3, 3, 3);
     eventPanel.add(dispatchEventButton, gridBagConstraints);
 
-    dispatchCommandFailedButton.setText(bundle.getString("loopbackCommAdapterPanel.button_failCurrentCommand.text")); // NOI18N
+    dispatchCommandFailedButton.setText(BUNDLE.getString("loopbackCommAdapterPanel.button_failCurrentCommand.text")); // NOI18N
     dispatchCommandFailedButton.addActionListener(new java.awt.event.ActionListener() {
       public void actionPerformed(java.awt.event.ActionEvent evt) {
         dispatchCommandFailedButtonActionPerformed(evt);
@@ -960,7 +1056,7 @@ public class LoopbackCommAdapterPanel
 
     vehicleStatePanel.add(stateContainerPanel, java.awt.BorderLayout.NORTH);
 
-    loadDevicePanel.setBorder(javax.swing.BorderFactory.createTitledBorder(bundle.getString("loopbackCommAdapterPanel.panel_loadHandlingDevice.border.title"))); // NOI18N
+    loadDevicePanel.setBorder(javax.swing.BorderFactory.createTitledBorder(BUNDLE.getString("loopbackCommAdapterPanel.panel_loadHandlingDevice.border.title"))); // NOI18N
     loadDevicePanel.setLayout(new java.awt.BorderLayout());
 
     jPanel1.setLayout(new java.awt.GridBagLayout());
@@ -980,7 +1076,7 @@ public class LoopbackCommAdapterPanel
 
     add(vehicleStatePanel, java.awt.BorderLayout.WEST);
 
-    getAccessibleContext().setAccessibleName(bundle.getString("loopbackCommAdapterPanel.accessibleName")); // NOI18N
+    getAccessibleContext().setAccessibleName(BUNDLE.getString("loopbackCommAdapterPanel.accessibleName")); // NOI18N
   }// </editor-fold>//GEN-END:initComponents
 
   private void singleModeRadioButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_singleModeRadioButtonActionPerformed
@@ -1016,6 +1112,7 @@ private void chkBoxEnableActionPerformed(java.awt.event.ActionEvent evt) {//GEN-
     }
 
     setStatePanelEnabled(chkBoxEnable.isSelected());
+    setVehiclePropsPanelEnabled(chkBoxEnable.isSelected());
   }
   catch (Exception ex) {
     LOG.warn("Error enabling/disabling comm adapter", ex);
@@ -1187,10 +1284,10 @@ private void chkBoxEnableActionPerformed(java.awt.event.ActionEvent evt) {//GEN-
 
   private void pauseVehicleCheckBoxItemStateChanged(java.awt.event.ItemEvent evt) {//GEN-FIRST:event_pauseVehicleCheckBoxItemStateChanged
     if (evt.getStateChange() == java.awt.event.ItemEvent.SELECTED) {
-      sendCommAdapterCommand(new SetVehiclePausedCommand(true));
+      setVehiclePaused(true);
     }
     else if (evt.getStateChange() == java.awt.event.ItemEvent.DESELECTED) {
-      sendCommAdapterCommand(new SetVehiclePausedCommand(false));
+      setVehiclePaused(false);
     }
   }//GEN-LAST:event_pauseVehicleCheckBoxItemStateChanged
 
@@ -1259,14 +1356,176 @@ private void chkBoxEnableActionPerformed(java.awt.event.ActionEvent evt) {//GEN-
     sendCommAdapterCommand(new SetLoadHandlingDevicesCommand(devices));
   }//GEN-LAST:event_lHDCheckboxClicked
 
+  private void maxFwdVeloTxtMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_maxFwdVeloTxtMouseClicked
+    if (!maxFwdVeloTxt.isEnabled()) {
+      return;
+    }
+    // Create panel and dialog
+    InputPanel panel = new SingleTextInputPanel.Builder(
+        BUNDLE.getString("loopbackCommAdapterPanel.dialog_setMaxFwdVelo.title"))
+        .setLabel(BUNDLE.getString("loopbackCommAdapterPanel.label_maxFwdVelo.text"))
+        .setUnitLabel("mm/s")
+        .setInitialValue(maxFwdVeloTxt.getText())
+        .enableValidation(TextInputPanel.TextInputValidator.REGEX_INT_POS)
+        .build();
+    InputDialog dialog = new InputDialog(panel);
+    dialog.setVisible(true);
+    // Get result from dialog and set max forward velocity
+    if (dialog.getReturnStatus() == InputDialog.ReturnStatus.ACCEPTED) {
+      String input = (String) dialog.getInput();
+      int maxFwdVelo;
+      try {
+        maxFwdVelo = Integer.parseInt(input);
+      }
+      catch (NumberFormatException e) {
+        return;
+      }
+
+      sendCommAdapterCommand(new SetMaxForwardVelocityCommand(maxFwdVelo));
+    }
+  }//GEN-LAST:event_maxFwdVeloTxtMouseClicked
+
+  private void maxRevVeloTxtMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_maxRevVeloTxtMouseClicked
+    if (!maxRevVeloTxt.isEnabled()) {
+      return;
+    }
+    // Create panel and dialog
+    InputPanel panel = new SingleTextInputPanel.Builder(
+        BUNDLE.getString("loopbackCommAdapterPanel.dialog_setMaxRevVelo.title"))
+        .setLabel(BUNDLE.getString("loopbackCommAdapterPanel.label_maxRevVelo.text"))
+        .setUnitLabel("mm/s")
+        .setInitialValue(maxRevVeloTxt.getText())
+        .enableValidation(TextInputPanel.TextInputValidator.REGEX_INT_POS)
+        .build();
+    InputDialog dialog = new InputDialog(panel);
+    dialog.setVisible(true);
+    // Get result from dialog and set max reverse velocity
+    if (dialog.getReturnStatus() == InputDialog.ReturnStatus.ACCEPTED) {
+      String input = (String) dialog.getInput();
+      int maxRevVelo;
+      try {
+        maxRevVelo = Integer.parseInt(input);
+      }
+      catch (NumberFormatException e) {
+        return;
+      }
+
+      sendCommAdapterCommand(new SetMaxReverseVelocityCommand(maxRevVelo));
+    }
+  }//GEN-LAST:event_maxRevVeloTxtMouseClicked
+
+  private void maxAccelTxtMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_maxAccelTxtMouseClicked
+    if (!maxAccelTxt.isEnabled()) {
+      return;
+    }
+    // Create panel and dialog
+    InputPanel panel = new SingleTextInputPanel.Builder(
+        BUNDLE.getString("loopbackCommAdapterPanel.dialog_setMaxAccel.title"))
+        .setLabel(BUNDLE.getString("loopbackCommAdapterPanel.label_maxAccel.text"))
+        .setUnitLabel("<html>mm/s<sup>2</sup>")
+        .setInitialValue(maxAccelTxt.getText())
+        .enableValidation(TextInputPanel.TextInputValidator.REGEX_INT_POS)
+        .build();
+    InputDialog dialog = new InputDialog(panel);
+    dialog.setVisible(true);
+    // Get result from dialog and set max acceleration
+    if (dialog.getReturnStatus() == InputDialog.ReturnStatus.ACCEPTED) {
+      String input = (String) dialog.getInput();
+      int maxAccel;
+      try {
+        maxAccel = Integer.parseInt(input);
+      }
+      catch (NumberFormatException e) {
+        return;
+      }
+
+      sendCommAdapterCommand(new SetMaxAccelerationCommand(maxAccel));
+    }
+  }//GEN-LAST:event_maxAccelTxtMouseClicked
+
+  private void maxDecelTxtMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_maxDecelTxtMouseClicked
+    if (!maxDecelTxt.isEnabled()) {
+      return;
+    }
+    // Create panel and dialog
+    InputPanel panel = new SingleTextInputPanel.Builder(
+        BUNDLE.getString("loopbackCommAdapterPanel.dialog_setMaxDecel.title"))
+        .setLabel(BUNDLE.getString("loopbackCommAdapterPanel.label_maxDecel.text"))
+        .setUnitLabel("<html>mm/s<sup>2</sup>")
+        .setInitialValue(maxDecelTxt.getText())
+        .enableValidation(TextInputPanel.TextInputValidator.REGEX_INT_NEG)
+        .build();
+    InputDialog dialog = new InputDialog(panel);
+    dialog.setVisible(true);
+    // Get result from dialog and set max deceleration
+    if (dialog.getReturnStatus() == InputDialog.ReturnStatus.ACCEPTED) {
+      String input = (String) dialog.getInput();
+      int maxDecel;
+      try {
+        maxDecel = Integer.parseInt(input);
+      }
+      catch (NumberFormatException e) {
+        return;
+      }
+
+      sendCommAdapterCommand(new SetMaxDecelerationCommand(maxDecel));
+    }
+  }//GEN-LAST:event_maxDecelTxtMouseClicked
+
+  private void opTimeTxtMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_opTimeTxtMouseClicked
+    if (!opTimeTxt.isEnabled()) {
+      return;
+    }
+    // Create panel and dialog
+    InputPanel panel = new SingleTextInputPanel.Builder(
+        BUNDLE.getString("loopbackCommAdapterPanel.dialog_setOpTime.title"))
+        .setLabel(BUNDLE.getString("loopbackCommAdapterPanel.label_opTime.text"))
+        .setUnitLabel("ms")
+        .setInitialValue(opTimeTxt.getText())
+        .enableValidation(TextInputPanel.TextInputValidator.REGEX_INT_POS)
+        .build();
+    InputDialog dialog = new InputDialog(panel);
+    dialog.setVisible(true);
+    // Get result from dialog and set operation time
+    if (dialog.getReturnStatus() == InputDialog.ReturnStatus.ACCEPTED) {
+      String input = (String) dialog.getInput();
+      int opTime;
+      try {
+        opTime = Integer.parseInt(input);
+      }
+      catch (NumberFormatException e) {
+        return;
+      }
+
+      sendCommAdapterCommand(new SetOperationTimeCommand(opTime));
+    }
+  }//GEN-LAST:event_opTimeTxtMouseClicked
+
+  private void errorTriggerButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_errorTriggerButtonActionPerformed
+    sendCommAdapterCommand(new SetStateCommand(Vehicle.State.ERROR));
+  }//GEN-LAST:event_errorTriggerButtonActionPerformed
+
+  private void obsBlockTriggerButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_obsBlockTriggerButtonActionPerformed
+    setVehiclePaused(true);
+  }//GEN-LAST:event_obsBlockTriggerButtonActionPerformed
+
+  private void restoreVehicleButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_restoreVehicleButtonActionPerformed
+    if (processModel.getVehicleState().isUnhealthy())
+      sendCommAdapterCommand(new SetStateCommand(Vehicle.State.IDLE));
+    if (processModel.isVehiclePaused())
+      setVehiclePaused(false);
+  }//GEN-LAST:event_restoreVehicleButtonActionPerformed
+
+    private void abruptStopTriggerButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_abruptStopTriggerButtonActionPerformed
+        sendCommAdapterCommand(new SetStateCommand(Vehicle.State.ABRUPT_STOP));
+    }//GEN-LAST:event_abruptStopTriggerButtonActionPerformed
+
   /**
    * Set the specified precise position to the text area. The method takes care
    * of the formatting. If any of the parameters is null all values will be set
    * to the "clear"-value.
    *
-   * @param x x-position
-   * @param y y-position
-   * @param z z-poition
+   * @param precisePos The precise position to be set.
    */
   private void setPrecisePosText(Triple precisePos) {
     // Convert values to strings
@@ -1294,8 +1553,10 @@ private void chkBoxEnableActionPerformed(java.awt.event.ActionEvent evt) {//GEN-
   }
 
   // Variables declaration - do not modify//GEN-BEGIN:variables
+  private javax.swing.JPanel ExceptionPanel;
   private javax.swing.JPanel PropsPowerInnerContainerPanel;
   private javax.swing.JPanel PropsPowerOuterContainerPanel;
+  private javax.swing.JButton abruptStopTriggerButton;
   private javax.swing.JTextField appendixTxt;
   private javax.swing.JCheckBox chkBoxEnable;
   private javax.swing.JPanel connectionPanel;
@@ -1308,7 +1569,9 @@ private void chkBoxEnableActionPerformed(java.awt.event.ActionEvent evt) {//GEN-
   private javax.swing.JLabel energyLevelLabel;
   private javax.swing.JLabel energyLevelLbl;
   private javax.swing.JTextField energyLevelTxt;
+  private javax.swing.JButton errorTriggerButton;
   private javax.swing.JPanel eventPanel;
+  private javax.swing.JPanel exceptionTriggerPanel;
   private javax.swing.Box.Filler filler1;
   private javax.swing.JRadioButton flowModeRadioButton;
   private javax.swing.JCheckBox includeAppendixCheckBox;
@@ -1334,6 +1597,7 @@ private void chkBoxEnableActionPerformed(java.awt.event.ActionEvent evt) {//GEN-
   private javax.swing.JTextField maxRevVeloTxt;
   private javax.swing.JLabel maxRevVeloUnitLbl;
   private javax.swing.ButtonGroup modeButtonGroup;
+  private javax.swing.JButton obsBlockTriggerButton;
   private javax.swing.JTextField opTimeTxt;
   private javax.swing.JLabel orientationAngleLbl;
   private javax.swing.JTextField orientationAngleTxt;
@@ -1349,6 +1613,7 @@ private void chkBoxEnableActionPerformed(java.awt.event.ActionEvent evt) {//GEN-
   private javax.swing.ButtonGroup propertyEditorGroup;
   private javax.swing.JPanel propertySetterPanel;
   private javax.swing.JRadioButton removePropRadioBtn;
+  private javax.swing.JButton restoreVehicleButton;
   private javax.swing.JRadioButton setPropValueRadioBtn;
   private javax.swing.JRadioButton singleModeRadioButton;
   private javax.swing.JPanel stateContainerPanel;

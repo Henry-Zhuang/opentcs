@@ -2,13 +2,14 @@ package org.opentcs.common.rms.message;
 
 import com.google.common.primitives.UnsignedLong;
 import org.opentcs.common.rms.NameConvertor;
-import org.opentcs.common.rms.robot.MTBStatus;
 import org.opentcs.common.rms.robot.MTDStatus;
+import org.opentcs.common.rms.robot.RobotMode;
 import org.opentcs.common.rms.robot.RobotType;
 import org.opentcs.drivers.vehicle.VehicleProcessModel;
 
 import lombok.NonNull;
 
+import java.util.ArrayList;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -34,19 +35,38 @@ public class MessageGenerator {
 
   public static Heartbeat generateHeartbeat(@NonNull VehicleProcessModel vehicleModel,
                                             @NonNull RobotType robotType,
-                                            Boolean isMoving,
-                                            Boolean isLaneY) {
+                                            Boolean isLaneY,
+                                            Boolean isPaused) {
     Heartbeat.HeartbeatParams params = new Heartbeat.HeartbeatParams();
 
     params.setRobotID(NameConvertor.toRobotId(vehicleModel.getName()));
     params.setUniqueID(vehicleModel.getUniqueId());
-    int status;
-    if (robotType.equals(RobotType.MT_D)){
-      status = isMoving ? MTDStatus.MOVING.getValue(): MTDStatus.IDLE.getValue();
-    } else {
-      status = isMoving ? MTBStatus.MOVING.getValue() : MTBStatus.IDLE.getValue();
+    params.setMode(RobotMode.AUTO.getValue());
+
+    ArrayList<Integer> errors = new ArrayList<>();
+    int status = MTDStatus.IDLE.getValue();
+    if (vehicleModel.isMoving())
+      status = MTDStatus.MOVING.getValue();
+    if (vehicleModel.isOperating())
+      status = MTDStatus.OPERATING.getValue();
+    if (vehicleModel.getVehicleState().isAbruptStop()) {
+      status = MTDStatus.ABRUPT_STOP.getValue();
+      errors.add(23);
+    } else if (vehicleModel.getVehicleState().isUnavailable()){
+      status = MTDStatus.ERROR.getValue();
+      errors.add(21);
+    } else if (vehicleModel.getVehicleState().isUnknown()) {
+      status = MTDStatus.ERROR.getValue();
+      errors.add(20);
+    } else if (vehicleModel.getVehicleState().isError()) {
+      status = MTDStatus.ERROR.getValue();
+      errors.add(12);
     }
     params.setStatus(status);
+
+    if (isPaused)
+      errors.add(22);
+    params.setErrors(errors);
     params.setPosition(NameConvertor.toPointId(vehicleModel.getVehiclePosition()));
     double theta = vehicleModel.getVehicleOrientationAngle();
     if (!Double.isNaN(theta)) {

@@ -155,4 +155,16 @@ public class Assertions {
     }
     return value;
   }
+
+  public static double checkInRange(double value, double minimum, double maximum, String valueName)
+      throws IllegalArgumentException {
+    if (value < minimum || value > maximum) {
+      throw new IllegalArgumentException(String.format("%s is not in [%f..%f]: %f",
+                                                       String.valueOf(valueName),
+                                                       minimum,
+                                                       maximum,
+                                                       value));
+    }
+    return value;
+  }
 }

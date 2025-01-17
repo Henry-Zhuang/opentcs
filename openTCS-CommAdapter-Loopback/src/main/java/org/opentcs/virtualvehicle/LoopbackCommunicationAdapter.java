@@ -32,8 +32,11 @@ import org.opentcs.components.kernel.services.InternalTransportOrderService;
 import org.opentcs.components.kernel.services.InternalVehicleService;
 import org.opentcs.customizations.ApplicationEventBus;
 import org.opentcs.customizations.kernel.KernelExecutor;
+import org.opentcs.data.TCSObjectReference;
+import org.opentcs.data.model.Path;
 import org.opentcs.data.model.Point;
 import org.opentcs.data.model.Vehicle;
+import org.opentcs.data.order.Route;
 import org.opentcs.data.order.Route.Step;
 import org.opentcs.data.order.TransportOrder;
 import org.opentcs.drivers.vehicle.BasicVehicleCommAdapter;
@@ -227,6 +230,10 @@ public class LoopbackCommunicationAdapter
     getProcessModel().getVelocityController().addVelocityListener(getProcessModel());
     super.enable();
     socketClient.enable();
+    if (getProcessModel().getVehicleEnergyLevel() == 0) {
+      getProcessModel().setVehicleEnergyLevel(100);
+    }
+    energyChangeSimulation();
   }
 
   @Override
@@ -266,7 +273,7 @@ public class LoopbackCommunicationAdapter
 
   @Override
   public synchronized void initVehiclePosition(String newPos) {
-    ((ExecutorService) getExecutor()).submit(() -> getProcessModel().setVehiclePosition(newPos));
+    ((ExecutorService) getExecutor()).submit(() -> setVehiclePositionAndDirection(newPos));
   }
 
   @Override
@@ -354,6 +361,104 @@ public class LoopbackCommunicationAdapter
     }
   }
 
+  private void energyChangeSimulation() {
+    if (!isEnabled()) {
+      return;
+    }
+
+    // 模拟电量变化
+    double factor = getProcessModel().getEnergyChangeFactor();
+    double delta = (getSimulationTimeStep() / getProcessModel().getFullRunningTime()) * 100 * factor;
+    double newLevel = getProcessModel().getVehicleEnergyLevel() + delta;
+    if (newLevel < 0) {
+      // 电量耗尽，车辆进入关机状态
+      getProcessModel().setVehicleEnergyLevel(0);
+      disable();
+      return;
+    } else if (newLevel > 100) {
+      // 电量充满，车辆自动停止充电
+      getProcessModel().setVehicleEnergyLevel(100);
+      getProcessModel().setVehicleState(Vehicle.State.IDLE);
+    } else {
+      // 电量变化
+      getProcessModel().setVehicleEnergyLevel(newLevel);
+    }
+    ((ScheduledExecutorService) getExecutor()).schedule(this::energyChangeSimulation,
+        SIMULATION_TASKS_DELAY,
+        TimeUnit.MILLISECONDS);
+  }
+
+  private void setVehiclePositionAndDirection(String newPos) {
+    Point point = null;
+    try {
+      point = vehicleService.fetchObject(Point.class, newPos);
+    }
+    catch (Exception ex) {
+      LOG.warn("Error fetching point", ex);
+    }
+    if (point != null) {
+      getProcessModel().setVehiclePosition(newPos);
+      getProcessModel().setVehicleOrientationAngle(getVehicleDirectionByPath(point));
+    }
+  }
+
+  private double getVehicleDirectionByPath(Point point) {
+    Point otherPoint = null;
+    Vehicle.Orientation forwardOrBackward = Vehicle.Orientation.FORWARD;
+    double direction = Double.NaN;
+
+    // 从出度路径中获取车辆的方向角
+    if (!point.getOutgoingPaths().isEmpty()) {
+      TCSObjectReference<Path> outRef = point.getOutgoingPaths().iterator().next();
+      Path outPath = null;
+      try {
+        outPath = vehicleService.fetchObject(Path.class, outRef);
+      }
+      catch (Exception ex) {
+        LOG.warn("Error fetching outPath", ex);
+      }
+      if (outPath != null) {
+        // 查询出度路径的目的点
+        TCSObjectReference<Point> pointRef = outPath.getDestinationPoint();
+        try {
+          otherPoint = vehicleService.fetchObject(Point.class, pointRef);
+        }
+        catch (Exception ex) {
+          LOG.warn("Error fetching destination point", ex);
+        }
+      }
+    }
+
+    // 从入度路径中获取车辆的方向角
+    if (otherPoint == null && !point.getIncomingPaths().isEmpty()) {
+      // 查询入度路径
+      TCSObjectReference<Path> inRef = point.getIncomingPaths().iterator().next();
+      Path inPath = null;
+      try {
+        inPath = vehicleService.fetchObject(Path.class, inRef);
+      }
+      catch (Exception ex) {
+        LOG.warn("Error fetching inPath", ex);
+      }
+      if (inPath != null) {
+        // 查询入度路径的起始点
+        TCSObjectReference<Point> srcRef = inPath.getSourcePoint();
+        try {
+          otherPoint = vehicleService.fetchObject(Point.class, srcRef);
+        }
+        catch (Exception ex) {
+          LOG.warn("Error fetching source point", ex);
+        }
+        forwardOrBackward = Vehicle.Orientation.BACKWARD;
+      }
+    }
+
+    if (otherPoint != null) {
+      direction = Route.Step.calculateVehicleDirection(point, otherPoint, forwardOrBackward);
+    }
+    return direction;
+  }
+
   private void startVehicleSimulation(MovementCommand command) {
     LOG.debug("Starting vehicle simulation for command: {}", command);
     Step step = command.getStep();
@@ -370,7 +475,8 @@ public class LoopbackCommunicationAdapter
           new WayEntry(step.getPath().getLength(),
               maxVelocity(step),
               step.getDestinationPoint().getName(),
-              step.getVehicleOrientation())
+              step.getVehicleOrientation(),
+              step.getVehicleDirection())
       );
       getProcessModel().setMoving(true);
       LOG.debug("Starting movement simulation...");
@@ -391,48 +497,107 @@ public class LoopbackCommunicationAdapter
       return;
     }
 
-    WayEntry prevWayEntry = getProcessModel().getVelocityController().getCurrentWayEntry();
-    getProcessModel().getVelocityController().advanceTime(getSimulationTimeStep());
-    energyConsumeSimulation(getSimulationTimeStep());  // 模拟电量消耗
-    WayEntry currentWayEntry = getProcessModel().getVelocityController().getCurrentWayEntry();
-    //if we are still on the same way entry then reschedule to do it again
-    if (prevWayEntry == currentWayEntry) {
+    // 若车辆处于非正常状态，则停止模拟，将当前指令置为失败
+    if (getProcessModel().getVehicleState().isUnhealthy()) {
+      LOG.debug("{}: Vehicle is in {} state, stopping movement simulation.", getName(), getProcessModel().getVehicleState());
+      getProcessModel().getVelocityController().finishCurWayEntry();
+      finishVehicleSimulation(command, false);
+      return;
+    }
+
+    // 若车辆处于暂停状态，则暂停模拟
+    if (getProcessModel().isVehiclePaused()) {
+      LOG.debug("{}: Vehicle is paused, pausing movement simulation.", getName());
+      getProcessModel().setMoving(false);
       ((ScheduledExecutorService) getExecutor()).schedule(() -> movementSimulation(command),
           SIMULATION_TASKS_DELAY,
           TimeUnit.MILLISECONDS);
+      return;
+    }
+
+    // 模拟车辆移动
+    WayEntry prevWayEntry = getProcessModel().getVelocityController().getCurrentWayEntry();
+    // 移动前判断车辆朝向是否符合路径要求的车辆方向角度一致
+    double sourceDir = getProcessModel().getVehicleOrientationAngle();
+    double requiredDir = getWayDirection(prevWayEntry, getProcessModel().getVehiclePosition());
+    if (calculateAngleDiff(sourceDir, requiredDir)  != 0) {
+      // 若车辆朝向不符合要求，则模拟车辆转向
+      rotationSimulation(command, sourceDir, requiredDir);
     } else {
-      //if the way enties are different then we have finished this step
-      //and we can move on.
-      getProcessModel().setVehicleOrientationAngle(
-          calculateAngle(getProcessModel().getVehiclePosition(), prevWayEntry.getDestPointName())
-      );
-      getProcessModel().setVehiclePosition(prevWayEntry.getDestPointName());
-      LOG.debug("Movement simulation finished.");
-      if (!command.isWithoutOperation()) {
-        LOG.debug("Starting operation simulation...");
-        ((ScheduledExecutorService) getExecutor()).schedule(() -> operationSimulation(command),
+      // 若车辆朝向符合要求，则模拟车辆前进
+      getProcessModel().getVelocityController().advanceTime(getSimulationTimeStep());
+      WayEntry currentWayEntry = getProcessModel().getVelocityController().getCurrentWayEntry();
+      //if we are still on the same way entry then reschedule to do it again
+      if (prevWayEntry == currentWayEntry) {
+        // 若车辆未走完当前路段，则继续模拟车辆前进
+        ((ScheduledExecutorService) getExecutor()).schedule(() -> movementSimulation(command),
             SIMULATION_TASKS_DELAY,
             TimeUnit.MILLISECONDS);
       } else {
-        finishVehicleSimulation(command);
+        //if the way enties are different then we have finished this step
+        //and we can move on.
+        // 若车辆已走完当前路段，则变更车辆位置点，并执行该路段的后续动作（若有指定动作）
+        getProcessModel().setVehiclePosition(prevWayEntry.getDestPointName());
+        LOG.debug("Movement simulation finished.");
+        if (!command.isWithoutOperation()) {
+          // 若该路段有后续动作，则开始执行后续动作
+          LOG.debug("Starting operation simulation...");
+          ((ScheduledExecutorService) getExecutor()).schedule(() -> operationSimulation(command),
+              SIMULATION_TASKS_DELAY,
+              TimeUnit.MILLISECONDS);
+        } else {
+          // 若该路段无后续动作，则完成该指令的模拟
+          finishVehicleSimulation(command, true);
+        }
       }
     }
   }
 
-  private double calculateAngle(String srcPointName, String destPointName) {
-    // 若目标点有指定Angle, 则使用该Angle
-    Point destPoint = requireNonNull(vehicleService.fetchObject(Point.class, destPointName));
-    if (!Double.isNaN(destPoint.getVehicleOrientationAngle()))
-      return destPoint.getVehicleOrientationAngle();
-    // 若起始点有指定Angle, 则使用该Angle
-    Point srcPoint = requireNonNull(vehicleService.fetchObject(Point.class, srcPointName));
-    if (!Double.isNaN(srcPoint.getVehicleOrientationAngle()))
-      return srcPoint.getVehicleOrientationAngle();
-    // 若两点均无指定Angle, 则根据两点坐标计算Angle
-    return Math.toDegrees(Math.atan2(
-        destPoint.getPosition().getY() - srcPoint.getPosition().getY(),
-        destPoint.getPosition().getX() - srcPoint.getPosition().getX()
-    ));
+  private double getWayDirection(WayEntry wayEntry, String vehiclePosition) {
+    double direction = wayEntry.getVehicleDirection();
+    if (Double.isNaN(direction)) {
+      Point srcPoint = requireNonNull(vehicleService.fetchObject(Point.class, vehiclePosition));
+      Point destPoint = requireNonNull(vehicleService.fetchObject(Point.class, wayEntry.getDestPointName()));
+      direction = Step.calculateVehicleDirection(srcPoint, destPoint, wayEntry.getVehicleOrientation());
+    }
+    return direction;
+  }
+
+  private double calculateAngleDiff(double sourceDir, double targetDir) {
+    // 计算从sourceDir到targetDir的最小夹角，若为正，表示逆时针旋转，若为负，表示顺时针旋转
+    double diff = (targetDir - sourceDir + 360) % 360;
+    if (diff > 180) {
+      diff -= 360;
+    }
+    return diff;
+  }
+
+  private void rotationSimulation(MovementCommand command, double sourceDir, double requiredDir) {
+    // FIXME: 这里暂时简化车辆以最大角速度旋转，后续可考虑加入转向时的加速度、减速度等因素
+    double angularVelocity = getProcessModel().getMaxAngularVelocity();
+    // 计算最小夹角，来决定旋转方向
+    double diff = calculateAngleDiff(sourceDir, requiredDir);
+    double delta = Math.min(Math.abs(diff), angularVelocity * getSimulationTimeStep() / 1000);
+    double newDir;
+    if (diff > 0) {
+      // 逆时针旋转
+      newDir = sourceDir + delta;
+      if (newDir >= 180)
+        newDir -= 360;
+    } else {
+      // 顺时针旋转
+      newDir = sourceDir - delta;
+      if (newDir < -180)
+        newDir += 360;
+    }
+    // 修改车辆方向角度
+    getProcessModel().setVehicleOrientationAngle(newDir);
+    // 一旦旋转，则说明车辆移动速度降为0
+    getProcessModel().getVelocityController().setCurrentVelocity(0);
+
+    ((ScheduledExecutorService) getExecutor()).schedule(() -> movementSimulation(command),
+        SIMULATION_TASKS_DELAY,
+        TimeUnit.MILLISECONDS);
   }
 
   private void operationSimulation(MovementCommand command) {
@@ -451,15 +616,12 @@ public class LoopbackCommunicationAdapter
   private void rechargeSimulation(MovementCommand command) {
     getProcessModel().setVehicleState(Vehicle.State.CHARGING);
     getProcessModel().setChargerConnected(true);
-    ((ScheduledExecutorService) getExecutor()).schedule(() -> energyGrowSimulation(getSimulationTimeStep()),
-        SIMULATION_TASKS_DELAY,
-        TimeUnit.MILLISECONDS);
-    finishVehicleSimulation(command);
+    finishVehicleSimulation(command, true);
   }
 
   private void stopRechargeSimulation(MovementCommand command) {
     getProcessModel().setChargerConnected(false);
-    finishVehicleSimulation(command);
+    finishVehicleSimulation(command, true);
   }
 
   private void jointOperationSimulation(MovementCommand command) {
@@ -467,7 +629,6 @@ public class LoopbackCommunicationAdapter
 
     if (operationSimulationTimePassed < JOINT_OPERATION_TIME) {
       getProcessModel().getVelocityController().advanceTime(getSimulationTimeStep());
-      energyConsumeSimulation(getSimulationTimeStep());  // 模拟电量消耗
       ((ScheduledExecutorService) getExecutor()).schedule(() -> operationSimulation(command),
           SIMULATION_TASKS_DELAY,
           TimeUnit.MILLISECONDS);
@@ -484,7 +645,7 @@ public class LoopbackCommunicationAdapter
 //            Arrays.asList(new LoadHandlingDevice(LHD_NAME, true))
 //        );
 //      }
-      finishVehicleSimulation(command);
+      finishVehicleSimulation(command, true);
     }
   }
 
@@ -492,8 +653,8 @@ public class LoopbackCommunicationAdapter
     operationSimulationTimePassed += getSimulationTimeStep();
 
     if (operationSimulationTimePassed < getProcessModel().getOperatingTime()) {
+      getProcessModel().setOperating(true);
       getProcessModel().getVelocityController().advanceTime(getSimulationTimeStep());
-      energyConsumeSimulation(getSimulationTimeStep());  // 模拟电量消耗
       ((ScheduledExecutorService) getExecutor()).schedule(() -> operationSimulation(command),
           SIMULATION_TASKS_DELAY,
           TimeUnit.MILLISECONDS);
@@ -516,49 +677,31 @@ public class LoopbackCommunicationAdapter
 //              Arrays.asList(new LoadHandlingDevice(LHD_NAME, false))
 //          );
 //      }
-      finishVehicleSimulation(command);
+      getProcessModel().setOperating(false);
+      finishVehicleSimulation(command, true);
     }
   }
 
-  private void energyGrowSimulation(double chargingTime) {
-    if (!getProcessModel().isChargerConnected())
-      return;
-
-    double oriEnergyLevel = getProcessModel().getVehicleEnergyLevel();
-    if (oriEnergyLevel < 100) {
-      double increment = (chargingTime / getProcessModel().getFullRechargingTime()) * 100;
-      double curEnergyLevel = Math.min(oriEnergyLevel + increment, 100.0);
-      getProcessModel().setVehicleEnergyLevel(curEnergyLevel);
-      ((ScheduledExecutorService) getExecutor()).schedule(() -> energyGrowSimulation(getSimulationTimeStep()),
-          SIMULATION_TASKS_DELAY,
-          TimeUnit.MILLISECONDS);
-    } else {
-      getProcessModel().setChargerConnected(false);
-      getProcessModel().setVehicleState(Vehicle.State.IDLE);
-    }
-  }
-
-  private void energyConsumeSimulation(int runningTime) {
-    double oriEnergyLevel = getProcessModel().getVehicleEnergyLevel();
-    if (oriEnergyLevel <= 0.0)
-      return;
-    double decrement = (((double) runningTime) / getProcessModel().getFullRunningTime()) * 100;
-    double curEnergyLevel = Math.max(oriEnergyLevel - decrement, 0.0);
-    getProcessModel().setVehicleEnergyLevel(curEnergyLevel);
-  }
-
-  private void finishVehicleSimulation(MovementCommand command) {
+  private void finishVehicleSimulation(MovementCommand command, boolean success) {
     //Set the vehicle state to idle
     if (getSentQueue().size() <= 1
         && getCommandQueue().isEmpty()
         && !command.getOperation().equals(getRechargeOperation())
     ) {
-      getProcessModel().setVehicleState(Vehicle.State.IDLE);
       getProcessModel().setMoving(false);
+      if (!getProcessModel().getVehicleState().isUnhealthy())
+        getProcessModel().setVehicleState(Vehicle.State.IDLE);
     }
     if (Objects.equals(getSentQueue().peek(), command)) {
       // Let the comm adapter know we have finished this command.
-      getProcessModel().commandExecuted(getSentQueue().poll());
+      if (success) {
+        getProcessModel().commandExecuted(getSentQueue().poll());
+      } else {
+        LOG.warn("{}: Simulated command failed: {}", getName(), command);
+        getProcessModel().setMoving(false);
+        getProcessModel().setOperating(false);
+        getProcessModel().commandFailed(getSentQueue().peek());
+      }
     } else {
       LOG.warn("{}: Simulated command not oldest in sent queue: {} != {}",
           getName(),

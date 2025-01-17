@@ -73,7 +73,7 @@ public class LoopbackVehicleModel
         attachedVehicle.getMaxVelocity());
     this.operatingTime = parseOperatingTime(attachedVehicle, defaultOperatingTime);
     this.fullRechargingTime = parseRechargingTime(attachedVehicle, defaultRechargeTime);
-    this.fullRunningTime = 4 * this.fullRechargingTime;
+    this.fullRunningTime = 6 * this.fullRechargingTime;
     this.loadOperation = extractLoadOperation(attachedVehicle);
     this.unloadOperation = extractUnloadOperation(attachedVehicle);
     this.robotType = extractRobotType(attachedVehicle);
@@ -328,6 +328,20 @@ public class LoopbackVehicleModel
     getPropertyChangeSupport().firePropertyChange(Attribute.VELOCITY_HISTORY.name(),
         null,
         velocityHistory);
+  }
+
+  /**
+   * 返回车辆的电量变化系数，为正时表示充电，为负时表示耗电。
+   * @return 电量变化系数
+   */
+  public synchronized double getEnergyChangeFactor() {
+    if (isChargerConnected()) {
+      return fullRunningTime / fullRechargingTime;
+    } else if (isMoving() || isOperating()) {
+      return -1.5;
+    } else {
+      return -1.0;
+    }
   }
 
   private int parseOperatingTime(Vehicle vehicle, int defaultOperatingTime) {

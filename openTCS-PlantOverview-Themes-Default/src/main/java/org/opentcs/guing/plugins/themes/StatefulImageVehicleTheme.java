@@ -119,21 +119,24 @@ public class StatefulImageVehicleTheme
     stateMapDefault.put(Vehicle.State.EXECUTING, loadImage(PATH + "normal.png"));
     stateMapDefault.put(Vehicle.State.IDLE, loadImage(PATH + "normal.png"));
     stateMapDefault.put(Vehicle.State.UNAVAILABLE, loadImage(PATH + "normal.png"));
-    stateMapDefault.put(Vehicle.State.UNKNOWN, loadImage(PATH + "normal.png"));
+    stateMapDefault.put(Vehicle.State.UNKNOWN, loadImage(PATH + "unknown.png"));
+    stateMapDefault.put(Vehicle.State.ABRUPT_STOP, loadImage(PATH + "abrupt_stop.png"));
 
     stateMapLoaded.put(Vehicle.State.CHARGING, loadImage(PATH + "charging_loaded.png"));
     stateMapLoaded.put(Vehicle.State.ERROR, loadImage(PATH + "error_loaded.png"));
     stateMapLoaded.put(Vehicle.State.EXECUTING, loadImage(PATH + "normal_loaded.png"));
     stateMapLoaded.put(Vehicle.State.IDLE, loadImage(PATH + "normal_loaded.png"));
     stateMapLoaded.put(Vehicle.State.UNAVAILABLE, loadImage(PATH + "normal_loaded.png"));
-    stateMapLoaded.put(Vehicle.State.UNKNOWN, loadImage(PATH + "normal_loaded.png"));
+    stateMapLoaded.put(Vehicle.State.UNKNOWN, loadImage(PATH + "unknown_loaded.png"));
+    stateMapLoaded.put(Vehicle.State.ABRUPT_STOP, loadImage(PATH + "abrupt_stop_loaded.png"));
 
     stateMapPaused.put(Vehicle.State.CHARGING, loadImage(PATH + "charging_paused.png"));
     stateMapPaused.put(Vehicle.State.ERROR, loadImage(PATH + "error_paused.png"));
     stateMapPaused.put(Vehicle.State.EXECUTING, loadImage(PATH + "normal_paused.png"));
     stateMapPaused.put(Vehicle.State.IDLE, loadImage(PATH + "normal_paused.png"));
     stateMapPaused.put(Vehicle.State.UNAVAILABLE, loadImage(PATH + "normal_paused.png"));
-    stateMapPaused.put(Vehicle.State.UNKNOWN, loadImage(PATH + "normal_paused.png"));
+    stateMapPaused.put(Vehicle.State.UNKNOWN, loadImage(PATH + "unknown_paused.png"));
+    stateMapPaused.put(Vehicle.State.ABRUPT_STOP, loadImage(PATH + "abrupt_stop_paused.png"));
 
     stateMapLoadedPaused.put(Vehicle.State.CHARGING,
                              loadImage(PATH + "charging_loaded_paused.png"));
@@ -142,7 +145,9 @@ public class StatefulImageVehicleTheme
     stateMapLoadedPaused.put(Vehicle.State.IDLE, loadImage(PATH + "normal_loaded_paused.png"));
     stateMapLoadedPaused.put(Vehicle.State.UNAVAILABLE,
                              loadImage(PATH + "normal_loaded_paused.png"));
-    stateMapLoadedPaused.put(Vehicle.State.UNKNOWN, loadImage(PATH + "normal_loaded_paused.png"));
+    stateMapLoadedPaused.put(Vehicle.State.UNKNOWN, loadImage(PATH + "unknown_loaded_paused.png"));
+    stateMapLoadedPaused.put(Vehicle.State.ABRUPT_STOP,
+                             loadImage(PATH + "abrupt_stop_loaded_paused.png"));
   }
 
   /**

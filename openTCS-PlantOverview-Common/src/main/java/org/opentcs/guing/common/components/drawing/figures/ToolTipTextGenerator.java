@@ -119,6 +119,7 @@ public class ToolTipTextGenerator {
     switch (vehicle.getState()) {
       case ERROR:
         return "red";
+      case ABRUPT_STOP:
       case UNAVAILABLE:
       case UNKNOWN:
         return "orange";

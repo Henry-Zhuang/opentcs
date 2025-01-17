@@ -195,6 +195,7 @@ public class SingleVehicleView
     vehicleStateValueLabel.setText(state.toString());
 
     switch (state) {
+      case ABRUPT_STOP:
       case ERROR:
       case UNAVAILABLE:
       case UNKNOWN:

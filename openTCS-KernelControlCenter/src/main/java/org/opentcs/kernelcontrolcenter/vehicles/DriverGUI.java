@@ -556,7 +556,7 @@ public class DriverGUI
   }//GEN-LAST:event_vehicleListPopupMenuPopupMenuWillBecomeVisible
 
   private void vehicleTableMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_vehicleTableMouseClicked
-    if (evt.getClickCount() == 2) {
+    if (evt.getClickCount() == 1) {
       int index = vehicleTable.getSelectedRow();
       if (index >= 0) {
         VehicleTableModel model = (VehicleTableModel) vehicleTable.getModel();

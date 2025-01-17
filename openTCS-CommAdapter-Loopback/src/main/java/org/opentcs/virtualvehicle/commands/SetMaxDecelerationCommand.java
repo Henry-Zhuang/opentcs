@@ -7,34 +7,32 @@
  */
 package org.opentcs.virtualvehicle.commands;
 
-import javax.annotation.Nullable;
 import org.opentcs.drivers.vehicle.AdapterCommand;
-import org.opentcs.drivers.vehicle.SimVehicleCommAdapter;
 import org.opentcs.drivers.vehicle.VehicleCommAdapter;
+import org.opentcs.virtualvehicle.LoopbackCommunicationAdapter;
 
 /**
- * A command to set a vehicle's position.
+ * A command to set a vehicle's maximum deceleration.
  */
-public class SetPositionCommand
+public class SetMaxDecelerationCommand
     implements AdapterCommand {
 
   /**
-   * The position to set.
+   * The maximum deceleration to set.
    */
-  private final String position;
+  private final int deceleration;
 
   /**
    * Creates a new instance.
    *
-   * @param position The position to set.
+   * @param deceleration The maximum deceleration to set.
    */
-  public SetPositionCommand(@Nullable String position) {
-    this.position = position;
+  public SetMaxDecelerationCommand(int deceleration) {
+    this.deceleration = deceleration;
   }
 
   @Override
   public void execute(VehicleCommAdapter adapter) {
-    ((SimVehicleCommAdapter) adapter).initVehiclePosition(position);
-//    adapter.getProcessModel().setVehiclePosition(position);
+    ((LoopbackCommunicationAdapter) adapter).getProcessModel().setMaxDeceleration(deceleration);
   }
 }

@@ -74,6 +74,10 @@ public class Vehicle
    */
   private final int maxReverseVelocity;
   /**
+   * 车辆的最大旋转角速度(in °/s)
+   */
+  private final double maxAngularVelocity;
+  /**
    * The operation the vehicle's current communication adapter accepts as a command to recharge the
    * vehicle.
    */
@@ -161,6 +165,7 @@ public class Vehicle
     this.energyLevelSufficientlyRecharged = 30;
     this.maxVelocity = 1000;
     this.maxReverseVelocity = 1000;
+    this.maxAngularVelocity = 30.0;
     this.rechargeOperation = "charge";
     this.procState = ProcState.IDLE;
     this.transportOrder = null;
@@ -191,6 +196,7 @@ public class Vehicle
                   int energyLevelSufficientlyRecharged,
                   int maxVelocity,
                   int maxReverseVelocity,
+                  double maxAngularVelocity,
                   String rechargeOperation,
                   ProcState procState,
                   TCSObjectReference<TransportOrder> transportOrder,
@@ -226,6 +232,7 @@ public class Vehicle
                                            0,
                                            Integer.MAX_VALUE,
                                            "maxReverseVelocity");
+    this.maxAngularVelocity = checkInRange(maxAngularVelocity, 0.0, Double.MAX_VALUE, "maxAngularVelocity");
     this.rechargeOperation = requireNonNull(rechargeOperation, "rechargeOperation");
     this.procState = requireNonNull(procState, "procState");
     this.transportOrder = transportOrder;
@@ -268,6 +275,7 @@ public class Vehicle
                        energyLevelSufficientlyRecharged,
                        maxVelocity,
                        maxReverseVelocity,
+                       maxAngularVelocity,
                        rechargeOperation,
                        procState,
                        transportOrder,
@@ -300,6 +308,7 @@ public class Vehicle
                        energyLevelSufficientlyRecharged,
                        maxVelocity,
                        maxReverseVelocity,
+                       maxAngularVelocity,
                        rechargeOperation,
                        procState,
                        transportOrder,
@@ -332,6 +341,7 @@ public class Vehicle
                        energyLevelSufficientlyRecharged,
                        maxVelocity,
                        maxReverseVelocity,
+                       maxAngularVelocity,
                        rechargeOperation,
                        procState,
                        transportOrder,
@@ -364,6 +374,7 @@ public class Vehicle
                        energyLevelSufficientlyRecharged,
                        maxVelocity,
                        maxReverseVelocity,
+                       maxAngularVelocity,
                        rechargeOperation,
                        procState,
                        transportOrder,
@@ -410,6 +421,7 @@ public class Vehicle
                        energyLevelSufficientlyRecharged,
                        maxVelocity,
                        maxReverseVelocity,
+                       maxAngularVelocity,
                        rechargeOperation,
                        procState,
                        transportOrder,
@@ -509,6 +521,7 @@ public class Vehicle
                        energyLevelSufficientlyRecharged,
                        maxVelocity,
                        maxReverseVelocity,
+                       maxAngularVelocity,
                        rechargeOperation,
                        procState,
                        transportOrder,
@@ -557,6 +570,7 @@ public class Vehicle
                        energyLevelSufficientlyRecharged,
                        maxVelocity,
                        maxReverseVelocity,
+                       maxAngularVelocity,
                        rechargeOperation,
                        procState,
                        transportOrder,
@@ -603,6 +617,7 @@ public class Vehicle
                        energyLevelSufficientlyRecharged,
                        maxVelocity,
                        maxReverseVelocity,
+                       maxAngularVelocity,
                        rechargeOperation,
                        procState,
                        transportOrder,
@@ -650,6 +665,7 @@ public class Vehicle
                        energyLevelSufficientlyRecharged,
                        maxVelocity,
                        maxReverseVelocity,
+                       maxAngularVelocity,
                        rechargeOperation,
                        procState,
                        transportOrder,
@@ -698,6 +714,7 @@ public class Vehicle
                        energyLevelSufficientlyRecharged,
                        maxVelocity,
                        maxReverseVelocity,
+                       maxAngularVelocity,
                        rechargeOperation,
                        procState,
                        transportOrder,
@@ -744,6 +761,7 @@ public class Vehicle
                        energyLevelSufficientlyRecharged,
                        maxVelocity,
                        maxReverseVelocity,
+                       maxAngularVelocity,
                        rechargeOperation,
                        procState,
                        transportOrder,
@@ -790,6 +808,7 @@ public class Vehicle
                        energyLevelSufficientlyRecharged,
                        maxVelocity,
                        maxReverseVelocity,
+                       maxAngularVelocity,
                        rechargeOperation,
                        procState,
                        transportOrder,
@@ -836,6 +855,53 @@ public class Vehicle
                        energyLevelSufficientlyRecharged,
                        maxVelocity,
                        maxReverseVelocity,
+                       maxAngularVelocity,
+                       rechargeOperation,
+                       procState,
+                       transportOrder,
+                       orderSequence,
+                       allowedOrderTypes,
+                       routeProgressIndex,
+                       claimedResources,
+                       allocatedResources,
+                       state,
+                       integrationLevel,
+                       paused,
+                       currentPosition,
+                       nextPosition,
+                       precisePosition,
+                       orientationAngle,
+                       energyLevel,
+                       loadHandlingDevices,
+                       layout);
+  }
+
+  /**
+   * 返回车辆的最大旋转角速度 (单位: °/s).
+   *
+   * @return 车辆的最大旋转角速度 (单位: °/s).
+   */
+  public double getMaxAngularVelocity() {
+    return maxAngularVelocity;
+  }
+
+  /**
+   * Creates a copy of this object, with the given maximum angular velocity.
+   * @param maxAngularVelocity The value to be set in the copy.
+   * @return A copy of this object, differing in the given value.
+   */
+  public Vehicle withMaxAngularVelocity(double maxAngularVelocity) {
+    return new Vehicle(getName(),
+                       getProperties(),
+                       getHistory(),
+                       length,
+                       energyLevelGood,
+                       energyLevelCritical,
+                       energyLevelFullyRecharged,
+                       energyLevelSufficientlyRecharged,
+                       maxVelocity,
+                       maxReverseVelocity,
+                       maxAngularVelocity,
                        rechargeOperation,
                        procState,
                        transportOrder,
@@ -893,6 +959,7 @@ public class Vehicle
                        energyLevelSufficientlyRecharged,
                        maxVelocity,
                        maxReverseVelocity,
+                       maxAngularVelocity,
                        rechargeOperation,
                        procState,
                        transportOrder,
@@ -948,6 +1015,7 @@ public class Vehicle
                        energyLevelSufficientlyRecharged,
                        maxVelocity,
                        maxReverseVelocity,
+                       maxAngularVelocity,
                        rechargeOperation,
                        procState,
                        transportOrder,
@@ -994,6 +1062,7 @@ public class Vehicle
                        energyLevelSufficientlyRecharged,
                        maxVelocity,
                        maxReverseVelocity,
+                       maxAngularVelocity,
                        rechargeOperation,
                        procState,
                        transportOrder,
@@ -1043,6 +1112,7 @@ public class Vehicle
                        energyLevelSufficientlyRecharged,
                        maxVelocity,
                        maxReverseVelocity,
+                       maxAngularVelocity,
                        rechargeOperation,
                        procState,
                        transportOrder,
@@ -1090,6 +1160,7 @@ public class Vehicle
                        energyLevelSufficientlyRecharged,
                        maxVelocity,
                        maxReverseVelocity,
+                       maxAngularVelocity,
                        rechargeOperation,
                        procState,
                        transportOrder,
@@ -1139,6 +1210,7 @@ public class Vehicle
                        energyLevelSufficientlyRecharged,
                        maxVelocity,
                        maxReverseVelocity,
+                       maxAngularVelocity,
                        rechargeOperation,
                        procState,
                        transportOrder,
@@ -1188,6 +1260,7 @@ public class Vehicle
                        energyLevelSufficientlyRecharged,
                        maxVelocity,
                        maxReverseVelocity,
+                       maxAngularVelocity,
                        rechargeOperation,
                        procState,
                        transportOrder,
@@ -1234,6 +1307,7 @@ public class Vehicle
                        energyLevelSufficientlyRecharged,
                        maxVelocity,
                        maxReverseVelocity,
+                       maxAngularVelocity,
                        rechargeOperation,
                        procState,
                        transportOrder,
@@ -1282,6 +1356,7 @@ public class Vehicle
                        energyLevelSufficientlyRecharged,
                        maxVelocity,
                        maxReverseVelocity,
+                       maxAngularVelocity,
                        rechargeOperation,
                        procState,
                        transportOrder,
@@ -1328,6 +1403,7 @@ public class Vehicle
                        energyLevelSufficientlyRecharged,
                        maxVelocity,
                        maxReverseVelocity,
+                       maxAngularVelocity,
                        rechargeOperation,
                        procState,
                        transportOrder,
@@ -1374,6 +1450,7 @@ public class Vehicle
                        energyLevelSufficientlyRecharged,
                        maxVelocity,
                        maxReverseVelocity,
+                       maxAngularVelocity,
                        rechargeOperation,
                        procState,
                        transportOrder,
@@ -1422,6 +1499,7 @@ public class Vehicle
                        energyLevelSufficientlyRecharged,
                        maxVelocity,
                        maxReverseVelocity,
+                       maxAngularVelocity,
                        rechargeOperation,
                        procState,
                        transportOrder,
@@ -1470,6 +1548,7 @@ public class Vehicle
                        energyLevelSufficientlyRecharged,
                        maxVelocity,
                        maxReverseVelocity,
+                       maxAngularVelocity,
                        rechargeOperation,
                        procState,
                        transportOrder,
@@ -1518,6 +1597,7 @@ public class Vehicle
                        energyLevelSufficientlyRecharged,
                        maxVelocity,
                        maxReverseVelocity,
+                       maxAngularVelocity,
                        rechargeOperation,
                        procState,
                        transportOrder,
@@ -1566,6 +1646,7 @@ public class Vehicle
                        energyLevelSufficientlyRecharged,
                        maxVelocity,
                        maxReverseVelocity,
+                       maxAngularVelocity,
                        rechargeOperation,
                        procState,
                        transportOrder,
@@ -1612,6 +1693,7 @@ public class Vehicle
                        energyLevelSufficientlyRecharged,
                        maxVelocity,
                        maxReverseVelocity,
+                       maxAngularVelocity,
                        rechargeOperation,
                        procState,
                        transportOrder,
@@ -1704,7 +1786,31 @@ public class Vehicle
     /**
      * The vehicle is currently recharging its battery/refilling fuel.
      */
-    CHARGING
+    CHARGING,
+    /**
+     * The vehicle has stopped abruptly.
+     */
+    ABRUPT_STOP;
+
+    public boolean isError() {
+      return this == ERROR;
+    }
+
+    public boolean isUnavailable() {
+      return this == UNAVAILABLE;
+    }
+
+    public boolean isUnknown() {
+      return this == UNKNOWN;
+    }
+
+    public boolean isAbruptStop() {
+      return this == ABRUPT_STOP;
+    }
+
+    public boolean isUnhealthy() {
+      return isError() || isUnavailable() || isUnknown() || isAbruptStop();
+    }
   }
 
   /**

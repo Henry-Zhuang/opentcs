@@ -71,6 +71,7 @@ public class Command extends Message {
     CONTINUE("continue", Channel.CONTROL.ordinal()),
     CHARGE("charge", Channel.CONTROL.ordinal()),
     LIFT("lift", Channel.CONTROL.ordinal()),
+    PATROL("patrol", Channel.CONTROL.ordinal()),
     STOP_CHARGE("stop charge", Channel.CONTROL.ordinal()),
     OFFLINE("offline", Channel.MANAGEMENT.ordinal()),
     ONLINE("online", Channel.MANAGEMENT.ordinal()),
